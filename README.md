@@ -1,24 +1,29 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/Ho0VU-Re)
-# [GIVE YOUR PROJECT A NAME!]
+# tpi-rag-decomposition
 
-> **TODO**: Replace this description with a short summary of what this data pipeline does and what problem it solves.
+Benchmark comparing two RAG strategies over TPI Carbon Performance PDFs, both using Nebius-hosted open-weight LLMs:
+
+- **Decomposition pipeline** (small model): breaks each question into sub-questions, retrieves and generates per sub-question, persists intermediates to SQLite, then assembles a final answer.
+- **Single-shot baseline** (large model): retrieves top-K chunks and answers in one prompt.
+
+Tests whether decomposition with a smaller, cheaper model can match or beat a larger model — evaluated on answer correctness, faithfulness, inspectability, latency, and token cost.
 
 ## Overview
 
-> **TODO**: Describe the purpose of this data pipeline, the data sources it consumes, and the outputs it produces.
+> **TODO**: Describe the data sources (which TPI PDFs, how they are ingested) and the outputs produced (evaluation results, reports).
 
 ## How to Run
 
 > **TODO**: Provide step-by-step instructions for running the pipeline. For example:
 >
 > 1. Install dependencies (see [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup).
-> 2. Configure any required environment variables or config files.
+> 2. Configure environment variables — copy `.env.example` to `.env` and fill in your `NEBIUS_API_KEY`.
 > 3. Run the pipeline:
 >    ```bash
->    # TODO: replace with the actual command to run the pipeline
+>    # TODO: replace with the actual command
 >    python pipeline.py
 >    ```
-> 4. Check the output in the `output/` directory (or wherever results are written).
+> 4. Check the output in the `reports/` directory.
 
 ## Configuration
 
