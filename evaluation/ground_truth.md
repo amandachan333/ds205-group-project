@@ -24,6 +24,7 @@
 
 ## Question 2
 **Question**: Given each company's most recent reported emissions intensity and their respective net-zero target year, which company faces the steepest required annual percentage reduction in emissions intensity to reach net-zero on schedule?
+
 **Expected answer**: CenterPoint Energy faces the steepest required annual reduction. CenterPoint must eliminate 1.09 MT/MWh over 12 years (2023→2035), requiring ~8.33% annual reduction. TNB must eliminate 0.5571 tCO2e/MWh over 26 years (2024→2050), requiring ~3.85% annual reduction. DEWA must eliminate 0.4045 tCO2e/MWh over 26 years (2024→2050), requiring ~3.85% annual reduction. CenterPoint's steeper requirement is driven primarily by its much shorter timeline to net-zero (2035 vs 2050), compounded by its higher starting intensity.
 
 **Sources**:
