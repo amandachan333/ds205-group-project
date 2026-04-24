@@ -44,3 +44,17 @@
 - Document: 2023CSR (CenterPoint Energy 2023 Corporate Sustainability Report), Page(s): 3, Section: Carbon Reduction and Energy Transition Efforts, Exact Quote: `we announced our ambitious company-wide Net Zero goals for our Scope 1 (direct) and Scope 2 (indirect) greenhouse gas (GHG) emissions by 2035.`
 - Document: CenterPoint Energy 2022 Corporate Sustainability Report, Page(s): 67 (PDF), Section: Carbon Reduction Technologies, Exact Quote: `NET ZERO BY 2035 NET-ZERO EMISSIONS BY 2035`
 - Document: Energy Transition Goals — CenterPoint Energy Sustainability, Page(s): 1, Section: Carbon Reduction / Scope 1 GHG Emissions, Exact Quote: `CenterPoint Energy is the first combined electric and natural gas utility with generation to announce its Net Zero goals for its Scope 1 and certain Scope 2 greenhouse gas emissions (GHG) by 2035, nearly 15 years ahead of certain of our peers' average goals.`
+
+## Question 3
+**Question**: Has Tenaga set intermediate emissions reduction targets between now and its long-term target year? What are they?
+
+**Expected answer**: Yes, Tenaga has set multiple intermediate targets leading up to its 2050 Net Zero goal. Its primary intermediate targets include achieving a 35% reduction in emissions intensity by 2035 (from a 2020 baseline) and a 50% reduction in coal generation capacity by 2035. More recently, TNB committed to a 5% annual reduction in Scope 1 emissions intensity starting from 2024. Other related intermediate milestones include ensuring that revenue from coal generation plants does not exceed 25% of total revenue and reaching 8.3GW of renewable energy capacity by 2025.
+
+**Sources**:
+- Document: TNB_IAR_2021.pdf, Section: Chairman's Letter to Shareholders, Exact Quote: `SP2050 also outlines our intermediate goal of reducing 35% of our emissions intensity and 50% of our coal generation capacity by 2035.`
+- Document: TNB_Sustainability_Report_2024.pdf, Section: MM3: Climate Change and Emissions / Our Performance, Exact Quote: `35% reduction of Scope 1 emissions intensity by 2035 and Net Zero Emissions by 2050, compared to the base year 2020 ... Revenue from coal generation plants does not exceed 25% of our total revenue ... 50% reduction of coal capacity by 2035 and 100% by 2050, compared to the base year 2020 ... 5% annual reduction of Scope 1 emissions intensity from 2024`
+- Document: TNB_Sustainability_Report_2024.pdf, Section: Joint Leadership Statement, Exact Quote: `In 2024, we operationalised our Carbon Emission Management Strategy, targeting a 5% annual reduction in emissions.`
+- Document: TNB_IAR_2024.pdf, Section: MM3: Climate Change and Emissions, Exact Quote: `TNB aims to reduce our annual carbon emissions intensity for Scope 1 by 5% annually from 2024. This annual target reflects our steadfast commitment to achieve 35% carbon emissions intensity reduction by 2035 and Net Zero by 2050.`
+- Document: TNB_Sustainability_Report_2022.pdf, Section: Climate Metrics and Targets, Exact Quote: `Reduction of scope 1 emission intensity of 35% by 2035 and net zero emission by 2050 ... Reduction of coal capacity of 50% by 2035 and 100% by 2050 ... Revenue from coal generation plants does not exceed 25% of our total revenue`
+
+
