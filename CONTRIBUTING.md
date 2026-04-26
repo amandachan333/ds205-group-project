@@ -2,6 +2,39 @@
 
 Dev setup and pipeline internals for anyone working on the codebase.
 
+## Repo structure (suggested structure for now, rmb to update)
+
+```
+repo/
+├── data/
+│   ├── raw/                        # source PDFs organised by company (gitignored)
+│   ├── chunks/                     # chunked text output from ingestion (gitignored)
+│   └── questions.json              # benchmark question set with ground truth
+├── db/
+│   ├── schema.sql                  # canonical CREATE TABLE definitions
+│   └── benchmark.db                # generated at runtime (gitignored)
+│   └── database.py                 # all SQLite read/write functions
+├── docs/                           # research notes, decisions, images
+├── evaluation/
+│   ├── harness.py                  # runs both pipelines on all questions
+│   ├── scorer.py                   # correctness and faithfulness scoring
+│   └── report_generator.py         # produces comparison tables
+├── pipelines/
+│   ├── shared/                     # retriever, LLM client, prompts (shared by both pipelines)
+│   ├── single_shot/
+│   │   └── pipeline.py
+│   └── multi_step/
+│       ├── pipeline.py             # orchestrator
+│       ├── decomposer.py           # Phase 1: decomposition call
+│       ├── solver.py               # Phase 2: sub-question execution loop
+│       └── assembler.py            # Phase 3: assembly call
+├── reports/                        # benchmark report and token spend summary
+├── tests/
+├── run_benchmark.py                # entry point
+├── .env.example
+└── pyproject.toml
+```
+
 ## Setting Up the Development Environment
 
 ### Prerequisites
@@ -45,6 +78,44 @@ Your `.env` file is git-ignored — never commit it.
 > - How does data flow between the decomposition pipeline and the single-shot baseline?
 > - How are intermediates persisted to SQLite?
 > - Any key design decisions worth explaining.
+
+### SQLite database schema
+
+The pipeline persists all runs, intermediate steps, final answers, and evaluation scores to a SQLite database at `db/benchmark.db`. The canonical schema is in `db/schema.sql`. All read/write logic is in `db/database.py` — no other file imports `sqlite3` directly.
+
+To recreate the database from scratch:
+
+```bash
+sqlite3 db/benchmark.db < db/schema.sql
+```
+
+#### Tables
+
+| Table | Description |
+|---|---|
+| `questions` | The benchmark question set. Populated once at setup before any pipeline runs. Stores the question text, ground truth, and question type. |
+| `runs` | One row per execution of one question through one pipeline. The central table everything else references. Tracks pipeline type, model, status, latency, and token spend. |
+| `steps` | Multi-step pipeline only. One row per sub-question — inserted as `pending` after decomposition, updated to `complete` after each LLM call. Stores the retrieved chunks and intermediate answer for each sub-step. |
+| `final_answers` | The assembled final output for each run. Kept separate from `runs` so the assembly call can be re-run without touching the step records. |
+| `evaluations` | Manual scoring of each run's final answer. Stores correctness label, faithfulness score, and evaluator notes. Separate from pipeline data so results can be re-scored independently. |
+
+#### Write sequence per run
+
+1. INSERT into `questions` — once at setup, not per run. Uses `INSERT OR IGNORE` so re-running setup is safe.
+2. INSERT into `runs` with `status = 'running'` → receive `run_id`.
+3. _Multi-step only._ INSERT N rows into `steps` with `status = 'pending'` — one per sub-question, all inserted before any retrieval or generation begins.
+4. _Multi-step only._ For each step: UPDATE `steps` to `status = 'complete'` with answer and token counts — must happen before moving to the next step.
+5. INSERT into `final_answers` with the assembled output.
+6. UPDATE `runs` to `status = 'complete'` with latency, total tokens, and cost. On failure, set `status = 'failed'`.
+7. INSERT into `evaluations` — after manual scoring, independent of pipeline execution.
+
+If a multi-step run crashes mid-way, querying `steps WHERE status = 'pending'` identifies exactly where to resume without re-running completed steps or spending NEBIUS tokens on work already done.
+
+#### Key constraints for pipeline code
+
+- `pipeline_type` on `runs` must be exactly `"single_shot"` or `"multi_step"` — use the constants in `pipelines/shared/constants.py`, never hardcode the strings.
+- Foreign key enforcement is enabled on every connection (`PRAGMA foreign_keys = ON`), so `question_id` must exist in `questions` before any run is created for it.
+- See `db/schema.sql` for full column definitions, types, and constraints.
 
 ## Known Bugs / Areas for Improvement
 
