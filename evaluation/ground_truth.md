@@ -60,4 +60,13 @@
 - Document: TNB_Sustainability_Report_2021.pdf, Page(s): 14, 15, Section: Sustainability at TNB, Exact Quote: `We aim to reduce 35% of our GHG emissions intensity and 50% of our coal generation capacity by 2035.`
 - Document: TNB_IAR_2021.pdf, Page(s): 28, Section: From Our Leadership, Exact Quote: `SP2050 also outlines our intermediate goal of reducing 35% of our emissions intensity and 50% of our coal generation capacity by 2035.`
 
+## Question 4
+**Question**: Has DEWA’s emissions intensity improved consistently since 2010, and by how much?
+
+**Expected answer**: DEWA's electricity emissions intensity has improved substantially overall since 2010 — falling from 0.4700 to 0.4045 tCO₂e/MWh, a net reduction of 0.0655 tCO₂e/MWh (−13.9%) — but the improvement has not been consistent. 2016, 2021, and 2024 saw year-on-year increases that interrupted the downward trend. The combined (electricity & water) intensity shows a similar pattern, declining from 0.5380 to 0.4572 (−15.0%), but with its own uptick years in 2015, 2016, 2021, and 2024.
+
+**Sources**:
+- Document: DEWA Sustainability Report 2024, Page(s): 56 (PDF), Section: Emissions and Mitigation Efforts, Carbon Intensity tCO₂e/MWh 2020–2024 chart, Exact Quote: `0.4041 0.4293 0.4035 0.3979 0.4045 [Electricity tCO₂e/MWh values for 2020–2024]`
+- Document: DEWA Sustainability Report 2019, Page(s): 31 (PDF), Section: Diversifying the Energy Mix, Shams Dubai Indicators' Progress, Exact Quote: `Grid Emission Factor, tCO2/MWh 0.4382 0.4333 0.4258 0.4178 [2016–2019]`
+- Document: DEWA Sustainability Report 2016, Page(s): 69 (PDF), Section: C02 Emission Reduction Programme, Exact Quote: `Carbon emissions intensity, tCO₂e per MWh of electricity generated (2010–2016) 0.47 0.538 0.469 0.527 0.449 0.502 0.4437 0.4991 0.4307 0.4932 0.4241 0.4382 0.4984 0.5045`
 
