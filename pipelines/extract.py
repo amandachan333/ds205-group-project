@@ -328,6 +328,18 @@ def _discover_pdfs(raw_dir: Path, company: str | None = None) -> list[Path]:
     return pdfs
 
 
+def _extracted_years(extracted_company_dir: Path) -> set[int]:
+    """Return the set of years already present in an extracted company directory."""
+    years: set[int] = set()
+    if not extracted_company_dir.exists():
+        return years
+    for jsonl_file in extracted_company_dir.glob("*.jsonl"):
+        year = derive_year(jsonl_file.stem)
+        if year is not None:
+            years.add(year)
+    return years
+
+
 def run_extraction(
     raw_dir: Path | str = Path("data/raw"),
     extracted_dir: Path | str = Path("data/extracted"),
@@ -363,16 +375,22 @@ def run_extraction(
                 "extract: no year found in filename '%s' — omitting from output name.",
                 pdf_path.name,
             )
+
+        if not force and year is not None:
+            done_years = _extracted_years(extracted_dir / company_name)
+            if year in done_years:
+                logging.info(
+                    "extract: skipping %s — year %d already present in %s.",
+                    pdf_path.name, year, extracted_dir / company_name,
+                )
+                continue
+
         out_name = (
             f"{company_name}_{year}_elements.jsonl"
             if year
             else f"{company_name}_elements.jsonl"
         )
         out_path = extracted_dir / company_name / out_name
-
-        if not force and out_path.exists():
-            logging.info("extract: skipping %s — already extracted.", out_path)
-            continue
 
         logging.info("extract: parsing %s / %s", company_name, pdf_path.name)
         records = extract_elements(pdf_path)

@@ -211,3 +211,6 @@ __marimo__/
 
 # macos 
 .DS_Store
+
+# raw data
+data/raw/
