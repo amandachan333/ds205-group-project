@@ -9,9 +9,9 @@ implementation (chunker.py / cleaner.py).  Design rationale and parameter
 choices are documented in DECISIONS.md.
 
 Usage:
-    python chunk.py                        # all companies
-    python chunk.py --company TNB          # one company
-    python hunk.py --force                # re-chunk existing
+    python pipelines/chunk.py                        # all companies
+    python pipelines/chunk.py --company TNB          # one company
+    python pipelines/chunk.py --force                # re-chunk existing
 """
 
 from __future__ import annotations
@@ -61,6 +61,16 @@ logger = logging.getLogger(__name__)
 _HEADING_TYPES: frozenset[str] = frozenset(
     {"Title", "Header", "Heading", "SubHeading", "Table"}
 )
+
+# Boilerplate patterns that appear verbatim across many company reports
+# (e.g. legal cautionary statements).  Chunks matching any of these are
+# dropped during cleaning — they add no retrieval value for carbon
+# performance questions.  Add new patterns here as you discover them.
+_BOILERPLATE_PATTERNS: list[str] = [
+    "important factors that could cause actual results to differ materially",
+    "forward-looking statements involve risks and uncertainties",
+    "cautionary statement",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +228,15 @@ def _split_long_chunks(
  
         if is_table:
             rows = [r for r in text.split("\n") if r.strip()]
+            # unstructured sometimes misclassifies dense narrative blocks as
+            # "Table".  If the text has no pipe characters it is not a
+            # Gemini-extracted table — fall back to sentence splitting.
+            has_pipe_format = any("|" in r for r in rows)
+            if not has_pipe_format:
+                is_table = False
+ 
+        if is_table:
+            rows = [r for r in text.split("\n") if r.strip()]
             header_text = _extract_table_header(rows)
  
             cur_rows: list[str] = []
@@ -332,6 +351,14 @@ def _fix_co2e(text: str) -> str:
         lambda m: m.group(1) + "CO2e",
         text,
     )
+
+
+def _is_boilerplate(text: str) -> bool:
+    """
+    Return True when *text* matches a known boilerplate pattern.
+    """
+    text_lower = text.lower()
+    return any(pattern in text_lower for pattern in _BOILERPLATE_PATTERNS)
 
 
 def _remove_gibberish(chunks: list[dict]) -> list[dict]:
@@ -514,7 +541,22 @@ def _clean_chunks(
 # ---------------------------------------------------------------------------
 # File-level processing
 # ---------------------------------------------------------------------------
-
+def _find_boilerplate_page(chunks: list[dict]) -> int | None:
+    """
+    Return the first page number where boilerplate content begins, or None.
+ 
+    Scans chunks in order and returns the page of the first chunk whose text
+    matches a boilerplate pattern.  All chunks from that page onwards are
+    then dropped by process_file — cautionary statements and legal disclaimers
+    always appear at the end of the document, so everything after the trigger
+    page is safe to remove.
+    """
+    for chunk in chunks:
+        if _is_boilerplate(chunk.get("text", "")):
+            return chunk.get("page_number")
+    return None
+ 
+ 
 def process_file(
     jsonl_path: Path,
     output_dir: Path,
@@ -522,32 +564,32 @@ def process_file(
 ) -> Path | None:
     """
     Chunk one extracted JSONL file and write the result to *output_dir*.
-
+ 
     Returns the output path on success, None if the file was skipped.
     """
     company: str = jsonl_path.parent.name
     # Remove the "_elements" suffix that OUR_PROJECT_extract.py appends
     doc_id: str = re.sub(r"_elements$", "", jsonl_path.stem)
     year: int | None = derive_year(doc_id)
-
+ 
     out_path: Path = output_dir / company / f"{doc_id}_chunks.jsonl"
-
+ 
     if out_path.exists() and not force:
         logger.info(
             "SKIP  %s/%s  (output exists; use --force to reprocess)",
             company, jsonl_path.name,
         )
         return None
-
+ 
     logger.info("Processing  %s / %s", company, jsonl_path.name)
-
+ 
     # Read extracted elements
     raw_records: list[dict] = load_jsonl(jsonl_path)
-
+ 
     if not raw_records:
         logger.warning("No records found in %s — skipping", jsonl_path)
         return None
-
+ 
     # Convert to internal element format
     page_para_counter: dict[int, int] = {}
     elements: list[dict] = [
@@ -555,21 +597,21 @@ def process_file(
         for r in raw_records
         if r.get("text", "").strip()
     ]
-
+ 
     logger.info("  Input elements: %d", len(elements))
-
+ 
     # Chunk
     raw_chunks = _chunk_by_sentences(elements)
     logger.info("  Raw chunks:     %d", len(raw_chunks))
-
+ 
     # Clean
     clean_chunks = _clean_chunks(raw_chunks)
     logger.info("  Clean chunks:   %d", len(clean_chunks))
-
+ 
     if not clean_chunks:
         logger.warning("No chunks produced for %s — skipping output", jsonl_path.name)
         return None
-
+ 
     # Build output records with stable, globally unique chunk IDs
     output_records: list[dict] = [
         {
@@ -584,7 +626,26 @@ def process_file(
         }
         for idx, chunk in enumerate(clean_chunks)
     ]
-
+ 
+    # Drop all chunks from the first boilerplate page onwards.
+    # Cautionary statements and legal disclaimers always appear at the end
+    # of the document, so this is safe to apply document-wide.
+    boilerplate_page = _find_boilerplate_page(output_records)
+    if boilerplate_page is not None:
+        before = len(output_records)
+        output_records = [
+            r for r in output_records
+            if (r.get("page_number") or 0) < boilerplate_page
+        ]
+        logger.info(
+            "  Dropped %d boilerplate chunk(s) from page %d onwards",
+            before - len(output_records), boilerplate_page,
+        )
+ 
+    if not output_records:
+        logger.warning("All chunks dropped as boilerplate for %s", jsonl_path.name)
+        return None
+ 
     save_jsonl_atomic(output_records, out_path)
     logger.info(
         "  Written → %s  (%d chunks)", out_path, len(output_records)
