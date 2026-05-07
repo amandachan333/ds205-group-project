@@ -64,13 +64,12 @@ _HEADING_TYPES: frozenset[str] = frozenset(
 
 # Boilerplate patterns that appear verbatim across many company reports
 # (e.g. legal cautionary statements).  Chunks matching any of these are
-# dropped during cleaning — they add no retrieval value for carbon
-# performance questions.  Add new patterns here as you discover them.
+# dropped during cleaning
 _BOILERPLATE_PATTERNS: list[str] = [
-    "important factors that could cause actual results to differ materially",
-    "forward-looking statements involve risks and uncertainties",
-    "cautionary statement",
+    "forward-looking statements",
 ]
+
+BOILERPLATE_PAGE_WINDOW: int = 5  # only match within last N pages of the doc
 
 
 # ---------------------------------------------------------------------------
@@ -545,17 +544,22 @@ def _find_boilerplate_page(chunks: list[dict]) -> int | None:
     """
     Return the first page number where boilerplate content begins, or None.
  
-    Scans chunks in order and returns the page of the first chunk whose text
-    matches a boilerplate pattern.  All chunks from that page onwards are
-    then dropped by process_file — cautionary statements and legal disclaimers
-    always appear at the end of the document, so everything after the trigger
-    page is safe to remove.
+    Only considers chunks within the last BOILERPLATE_PAGE_WINDOW pages of
+    the document.  This prevents false matches on legitimate mentions of
+    "forward-looking statements" in the body of the report — those phrases
+    can appear in strategy sections but the legal disclaimer is always at
+    the very end.
     """
+    if not chunks:
+        return None
+    last_page = max(c.get("page_number") or 0 for c in chunks)
+    window_start = last_page - BOILERPLATE_PAGE_WINDOW + 1
     for chunk in chunks:
-        if _is_boilerplate(chunk.get("text", "")):
-            return chunk.get("page_number")
+        page = chunk.get("page_number") or 0
+        if page >= window_start and _is_boilerplate(chunk.get("text", "")):
+            return page
     return None
- 
+
  
 def process_file(
     jsonl_path: Path,
@@ -628,8 +632,8 @@ def process_file(
     ]
  
     # Drop all chunks from the first boilerplate page onwards.
-    # Cautionary statements and legal disclaimers always appear at the end
-    # of the document, so this is safe to apply document-wide.
+    # The trigger page is only detected within the last BOILERPLATE_PAGE_WINDOW
+    # pages, so earlier legitimate mentions are not affected.
     boilerplate_page = _find_boilerplate_page(output_records)
     if boilerplate_page is not None:
         before = len(output_records)
