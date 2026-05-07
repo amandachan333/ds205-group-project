@@ -8,13 +8,10 @@ Chunking strategy is adapted from the TPI CLEAR reference
 implementation (chunker.py / cleaner.py).  Design rationale and parameter
 choices are documented in DECISIONS.md.
 
-Dependencies:
-    pip install nltk
-
 Usage:
-    python OUR_PROJECT_chunk.py                        # all companies
-    python OUR_PROJECT_chunk.py --company BHP          # one company
-    python OUR_PROJECT_chunk.py --force                # re-chunk existing
+    python chunk.py                        # all companies
+    python chunk.py --company TNB          # one company
+    python hunk.py --force                # re-chunk existing
 """
 
 from __future__ import annotations
@@ -40,7 +37,7 @@ from config import (
     MIN_CHUNK_LENGTH,
     SENTENCE_OVERLAP,
 )
-from utils import derive_year, ensure_stage_dirs, save_jsonl_atomic
+from utils import derive_year, ensure_stage_dirs, save_jsonl_atomic, load_jsonl
 
 # ---------------------------------------------------------------------------
 # Logging – writes to logs/chunk.log AND stderr
@@ -229,11 +226,34 @@ def _is_severely_corrupted(text: str) -> bool:
     return False
 
 
+def _fix_co2e(text: str) -> str:
+    """
+    Normalise tCO,e / tco,e -> tCO2e.
+ 
+    unstructured renders the subscript '2' in CO2e as a comma when it
+    fails to parse the glyph, producing artefacts like:
+        '14.7 MtCO,e'  '0.5 tco,e'  '3.2 ktCO,e'
+ 
+    Matches optional SI prefix (k/M/G) + t/T, then CO/co, comma, e/eq.
+    """
+    return re.sub(
+        r"\b([kKmMgG]?[tT])[Cc][Oo],[Ee][Qq]?\b",
+        lambda m: m.group(1) + "CO2e",
+        text,
+    )
+
+
 def _remove_gibberish(chunks: list[dict]) -> list[dict]:
     """
     Drop severely corrupted chunks; lightly clean the rest.
     Mirrors TPI remove_gibberish but without heavy Latin-script heuristics
     that are unnecessary for our corpus quality.
+ 
+    Cleaning steps applied to each surviving chunk:
+      1. Strip CID encoding artefacts  e.g. (cid:42)
+      2. Remove non-printable control characters
+      3. Normalise tCO,e -> tCO2e  (subscript-2 rendered as comma)
+      4. Collapse whitespace
     """
     clean: list[dict] = []
     for chunk in chunks:
@@ -243,12 +263,13 @@ def _remove_gibberish(chunks: list[dict]) -> list[dict]:
             continue
         text = re.sub(r"\(cid:\d+\)", " ", text)
         text = re.sub(r"[\x00-\x08\x0e-\x1f\x7f]", " ", text)
+        text = _fix_co2e(text)
         text = " ".join(text.split())
         if len(text.strip()) > 5:
             chunk["text"] = text.strip()
             clean.append(chunk)
     return clean
-
+ 
 
 # ---------------------------------------------------------------------------
 # Core sentence-based chunker  (adapted from TPI DocChunker.chunk_document_by_sentences)
@@ -430,12 +451,7 @@ def process_file(
     logger.info("Processing  %s / %s", company, jsonl_path.name)
 
     # Read extracted elements
-    raw_records: list[dict] = []
-    with jsonl_path.open(encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if line:
-                raw_records.append(json.loads(line))
+    raw_records: list[dict] = load_jsonl(jsonl_path)
 
     if not raw_records:
         logger.warning("No records found in %s — skipping", jsonl_path)
