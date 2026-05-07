@@ -55,9 +55,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# unstructured element types treated as standalone heading chunks
+# unstructured element types emitted as standalone chunks (never sentence-split).
+# "Table" is included because Gemini extracts tables as single pipe-delimited
+# text blocks; splitting mid-table destroys row/column context.
 _HEADING_TYPES: frozenset[str] = frozenset(
-    {"Title", "Header", "Heading", "SubHeading"}
+    {"Title", "Header", "Heading", "SubHeading", "Table"}
 )
 
 
@@ -117,7 +119,7 @@ def _convert_element(
 
 
 # ---------------------------------------------------------------------------
-# Cleaner helpers  (adapted from TPI cleaner.py – standalone, no import)
+# Cleaner helpers  (adapted from TPI cleaner.py)
 # ---------------------------------------------------------------------------
 
 def _merge_short_chunks(
@@ -125,20 +127,26 @@ def _merge_short_chunks(
 ) -> list[dict]:
     """
     Merge a chunk into the one before it when the preceding chunk is
-    shorter than *min_length* characters.  Mirrors TPI merge_short_chunks.
+    shorter than *min_length* characters.
+ 
+    Table chunks are never merged regardless of length — a two-row table
+    is still a self-contained unit and should not be glued to the
+    following paragraph.  Mirrors TPI merge_short_chunks.
     """
     if not chunks:
         return chunks
-
+ 
     merged: list[dict] = []
     current: dict | None = None
-
+ 
     for chunk in chunks:
         if current is None:
             current = chunk
             continue
-
-        if len(current["text"]) < min_length:
+ 
+        current_is_table = "Table" in current.get("metadata", {}).get("element_types", [])
+ 
+        if len(current["text"]) < min_length and not current_is_table:
             current["text"] = current["text"] + " " + chunk["text"]
             meta_c = current.get("metadata", {})
             meta_n = chunk.get("metadata", {})
@@ -150,38 +158,137 @@ def _merge_short_chunks(
         else:
             merged.append(current)
             current = chunk
-
+ 
     if current is not None:
         merged.append(current)
     return merged
-
-
+ 
+ 
+def _extract_table_header(rows: list[str]) -> str:
+    """
+    Extract header context from a list of table rows, for use when a
+    large table must be split across multiple chunks.
+ 
+    In Gemini's pipe-delimited output format:
+    - Rows with no '|' are section labels / captions (full-width markers).
+    - The first row with '|' encodes the column structure as 'Col: value'.
+ 
+    Returns a string to prepend to sub-chunks 2, 3, ... so each one
+    carries enough context to be independently interpretable.
+    """
+    header_lines: list[str] = []
+ 
+    # Collect leading label/caption rows (no pipe = not a data row)
+    first_data_idx = 0
+    for i, row in enumerate(rows):
+        if "|" not in row:
+            header_lines.append(row)
+            first_data_idx = i + 1
+        else:
+            break
+ 
+    # Include the first data row — its keys name the columns
+    if first_data_idx < len(rows):
+        header_lines.append(rows[first_data_idx])
+ 
+    return "\n".join(header_lines)
+ 
+ 
 def _split_long_chunks(
     chunks: list[dict], max_length: int = MAX_CHUNK_LENGTH
 ) -> list[dict]:
     """
-    Hard-split any chunk longer than *max_length* chars on sentence
-    boundaries.  Mirrors TPI split_long_chunks.
+    Hard-split any chunk longer than *max_length* chars.
+ 
+    - Regular text: split on sentence boundaries (original behaviour).
+    - Table chunks: split on row boundaries (newlines) and prepend the
+      table header to every continuation sub-chunk so each one is
+      independently interpretable without the rows that came before it.
     """
     result: list[dict] = []
     counter = 0
-
+ 
     for chunk in chunks:
         text = chunk.get("text", "")
         if len(text) <= max_length:
             result.append(chunk)
             continue
-
-        sentences: list[str] = chunk.get("sentences") or sent_tokenize(text)
-        cur_text = ""
-        cur_sentences: list[str] = []
-
-        for sentence in sentences:
-            would_exceed = (
-                cur_text
-                and len(cur_text) + 1 + len(sentence) > max_length
-            )
-            if would_exceed:
+ 
+        is_table = "Table" in chunk.get("metadata", {}).get("element_types", [])
+ 
+        if is_table:
+            rows = [r for r in text.split("\n") if r.strip()]
+            header_text = _extract_table_header(rows)
+ 
+            cur_rows: list[str] = []
+            cur_len: int = 0
+            is_continuation: bool = False  # True for sub-chunks 2, 3, …
+ 
+            for row in rows:
+                row_len = len(row) + 1  # +1 for the joining newline
+                if cur_rows and cur_len + row_len > max_length:
+                    result.append({
+                        "id": f"_split_{counter}",
+                        "text": "\n".join(cur_rows),
+                        "metadata": {
+                            **chunk.get("metadata", {}).copy(),
+                            "table_continuation": is_continuation,
+                        },
+                    })
+                    counter += 1
+                    # Prepend header rows to continuation sub-chunks
+                    is_continuation = True
+                    cur_rows = (
+                        [*header_text.split("\n"), row]
+                        if header_text else [row]
+                    )
+                    cur_len = (
+                        len(header_text) + 1 + row_len
+                        if header_text else row_len
+                    )
+                else:
+                    cur_rows.append(row)
+                    cur_len += row_len
+ 
+            if cur_rows:
+                result.append({
+                    "id": f"_split_{counter}",
+                    "text": "\n".join(cur_rows),
+                    "metadata": {
+                        **chunk.get("metadata", {}).copy(),
+                        "table_continuation": is_continuation,
+                    },
+                })
+                counter += 1
+ 
+        else:
+            # Original sentence-boundary split for non-table chunks
+            sentences: list[str] = chunk.get("sentences") or sent_tokenize(text)
+            cur_text = ""
+            cur_sentences: list[str] = []
+ 
+            for sentence in sentences:
+                would_exceed = (
+                    cur_text
+                    and len(cur_text) + 1 + len(sentence) > max_length
+                )
+                if would_exceed:
+                    result.append({
+                        "id": f"_split_{counter}",
+                        "text": cur_text.strip(),
+                        "sentences": cur_sentences,
+                        "metadata": chunk.get("metadata", {}).copy(),
+                    })
+                    counter += 1
+                    cur_text = sentence
+                    cur_sentences = [sentence]
+                else:
+                    cur_text = (
+                        (cur_text + " " + sentence).strip() if cur_text else sentence
+                    )
+                    cur_sentences.append(sentence)
+ 
+            if cur_text:
                 result.append({
                     "id": f"_split_{counter}",
                     "text": cur_text.strip(),
@@ -189,23 +296,7 @@ def _split_long_chunks(
                     "metadata": chunk.get("metadata", {}).copy(),
                 })
                 counter += 1
-                cur_text = sentence
-                cur_sentences = [sentence]
-            else:
-                cur_text = (
-                    (cur_text + " " + sentence).strip() if cur_text else sentence
-                )
-                cur_sentences.append(sentence)
-
-        if cur_text:
-            result.append({
-                "id": f"_split_{counter}",
-                "text": cur_text.strip(),
-                "sentences": cur_sentences,
-                "metadata": chunk.get("metadata", {}).copy(),
-            })
-            counter += 1
-
+ 
     return result
 
 
