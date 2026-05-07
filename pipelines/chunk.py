@@ -97,7 +97,7 @@ def _convert_element(
     page_para_counter: dict[int, int],
 ) -> dict[str, Any]:
     """
-    Map one record from OUR_PROJECT_extract.py JSONL format into the
+    Map one record from extract.py JSONL format into the
     internal element dict expected by the chunking functions below.
 
     Extracted record keys: text, element_type, element_id, parent_id,
@@ -108,7 +108,7 @@ def _convert_element(
                            document_title}
 
     Paragraph numbers are assigned as page-relative counters because
-    OUR_PROJECT_extract.py does not emit them.
+    extract.py does not emit them.
     """
     page: int = record.get("page_number") or 0
     page_para_counter.setdefault(page, 0)
@@ -572,7 +572,7 @@ def process_file(
     Returns the output path on success, None if the file was skipped.
     """
     company: str = jsonl_path.parent.name
-    # Remove the "_elements" suffix that OUR_PROJECT_extract.py appends
+    # Remove the "_elements" suffix that extract.py appends
     doc_id: str = re.sub(r"_elements$", "", jsonl_path.stem)
     year: int | None = derive_year(doc_id)
  

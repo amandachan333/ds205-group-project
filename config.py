@@ -18,7 +18,7 @@ CHUNKED_DIR: Path = Path("data/chunked")
 DB_PATH: Path = Path("data/vector_store.db")
 LOG_DIR: Path = Path("logs")
 
-# Token-spend audit trail (appended to by OUR_PROJECT_embed.py)
+# Token-spend audit trail (appended to by embed.py)
 TOKEN_SPEND_LOG: Path = LOG_DIR / "token_spend.jsonl"
 
 # ---------------------------------------------------------------------------
@@ -37,6 +37,8 @@ EMBEDDING_DIM: int = 4096
 EMBED_BATCH_SIZE: int = 16     # conservative default for an 8B model
 EMBED_RETRY_ATTEMPTS: int = 3
 EMBED_RETRY_SLEEP_S: float = 5.0
+# NEBIUS pricing for Qwen3-Embedding-8B (USD per 1M tokens, input only)
+EMBED_COST_PER_1M_TOKENS: float = 0.01
 
 # NEBIUS base URL
 NEBIUS_BASE_URL: str = os.environ.get(

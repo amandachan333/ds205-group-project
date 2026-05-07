@@ -214,3 +214,6 @@ __marimo__/
 
 # raw data
 data/raw/
+
+# database
+data/vector_store.db
