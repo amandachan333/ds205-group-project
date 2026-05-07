@@ -27,11 +27,15 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 _gemini_client: genai.Client | None = None
 
-_GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+_GEMINI_MODEL = "gemini-2.5-flash"
 
 # DPI for rasterising PDF pages before sending to Gemini. Higher = better
 # table quality at the cost of larger image payloads and slower API calls.
 _RASTERISE_DPI = int(os.environ.get("PDF_RASTERISE_DPI", "200"))
+
+# Maximum table pages per Gemini API call. Keeps output within token
+# limits and avoids truncation on table-heavy documents.
+_BATCH_PAGE_LIMIT = int(os.environ.get("GEMINI_BATCH_PAGE_LIMIT", "30"))
 
 _TABLE_EXTRACTION_PROMPT = """\
 You are a precise data extraction tool. Extract ALL rows from every table on this page.
@@ -65,7 +69,7 @@ def _get_gemini_client() -> genai.Client:
         )
 
     _gemini_client = genai.Client(api_key=api_key)
-    logging.info("extract: Gemini client initialised (model=%s).", _GEMINI_MODEL)
+    logging.info("extract: Gemini client initialised.")
     return _gemini_client
 
 
@@ -87,15 +91,16 @@ def _rasterise_page(pdf_path: Path, page_number: int, dpi: int = _RASTERISE_DPI)
 
 
 # ---------------------------------------------------------------------------
-# Gemini table extraction (batched — all table pages in one API call)
+# Gemini table extraction (batched)
 # ---------------------------------------------------------------------------
 
 def _extract_tables_for_pages(
     pdf_path: Path, page_numbers: set[int], dpi: int = _RASTERISE_DPI
 ) -> dict[int, list[str]]:
-    """Send all table pages to Gemini in one batched API call; returns {page_num: [table_text, ...]}."""
+    """Send table pages to Gemini in batched API calls; returns {page_num: [table_text, ...]}."""
     sorted_pages = sorted(page_numbers)
 
+    # Rasterise all pages up-front (no API cost)
     page_images: dict[int, bytes] = {}
     for pn in sorted_pages:
         try:
@@ -109,36 +114,53 @@ def _extract_tables_for_pages(
     if not page_images:
         return {}
 
-    contents: list = []
-    for pn in sorted_pages:
-        if pn not in page_images:
-            continue
-        contents.append(f"--- PAGE {pn} ---")
-        contents.append(
-            types.Part.from_bytes(data=page_images[pn], mime_type="image/png")
-        )
-
-    contents.append(
-        _TABLE_EXTRACTION_PROMPT
-        + "\n\nIMPORTANT: There are multiple pages. Start each page's output with "
-        "a line exactly like '=== PAGE 1 ===' (using the actual page number). "
-        "Extract tables from ALL pages."
-    )
+    # Split into batches of _BATCH_PAGE_LIMIT
+    available_pages = [pn for pn in sorted_pages if pn in page_images]
+    batches = [
+        available_pages[i : i + _BATCH_PAGE_LIMIT]
+        for i in range(0, len(available_pages), _BATCH_PAGE_LIMIT)
+    ]
 
     logging.info(
-        "extract: sending %d table page(s) to Gemini in one batch request.",
-        len(page_images),
+        "extract: %d table page(s) across %d batch(es) (limit %d per batch).",
+        len(available_pages), len(batches), _BATCH_PAGE_LIMIT,
     )
 
-    output_text = _gemini_call_with_retry(contents, label=f"batch {sorted_pages}")
-    if not output_text:
-        return {}
+    merged: dict[int, list[str]] = {}
+    for batch_idx, batch_pages in enumerate(batches, 1):
+        contents: list = []
+        for pn in batch_pages:
+            contents.append(f"--- PAGE {pn} ---")
+            contents.append(
+                types.Part.from_bytes(data=page_images[pn], mime_type="image/png")
+            )
 
-    return _split_by_page(output_text, sorted_pages)
+        contents.append(
+            _TABLE_EXTRACTION_PROMPT
+            + "\n\nIMPORTANT: There are multiple pages. Start each page's output with "
+            "a line exactly like '=== PAGE 1 ===' (using the actual page number). "
+            "Extract tables from ALL pages."
+        )
+
+        logging.info(
+            "extract: batch %d/%d — sending %d page(s) to Gemini.",
+            batch_idx, len(batches), len(batch_pages),
+        )
+
+        output_text = _gemini_call_with_retry(
+            contents, label=f"batch {batch_idx}/{len(batches)} {batch_pages}"
+        )
+        if not output_text:
+            continue
+
+        batch_result = _split_by_page(output_text, batch_pages)
+        merged.update(batch_result)
+
+    return merged
 
 
 def _gemini_call_with_retry(contents: list, label: str = "", max_retries: int = 5) -> str:
-    """Make a Gemini API call with retry on 429 errors."""
+    """Make a Gemini API call with retry on 429/503."""
     client = _get_gemini_client()
 
     for attempt in range(max_retries):
@@ -146,15 +168,20 @@ def _gemini_call_with_retry(contents: list, label: str = "", max_retries: int = 
             response = client.models.generate_content(
                 model=_GEMINI_MODEL,
                 contents=contents,
+                config=types.GenerateContentConfig(max_output_tokens=65536),
             )
             return response.text.strip() if response.text else ""
         except Exception as exc:
             exc_str = str(exc)
-            if "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str:
+            is_rate_limit = "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str
+            is_overloaded = "503" in exc_str or "UNAVAILABLE" in exc_str
+
+            if is_rate_limit or is_overloaded:
                 wait = _parse_retry_delay(exc_str) or (30 * (2 ** attempt))
                 logging.warning(
-                    "extract: %s — rate limited (attempt %d/%d), waiting %.0fs...",
-                    label, attempt + 1, max_retries, wait,
+                    "extract: %s — %s (attempt %d/%d), waiting %.0fs...",
+                    label, "rate limited" if is_rate_limit else "overloaded",
+                    attempt + 1, max_retries, wait,
                 )
                 time.sleep(wait)
                 continue
