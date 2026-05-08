@@ -18,4 +18,6 @@ dependencies:
       - python-magic
       - nltk
       - "openai>=1.0"
-      - sqlite-vec 
+      - sqlite-vec
+      - rank-bm25 
+      - numpy 
