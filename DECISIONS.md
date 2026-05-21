@@ -61,9 +61,7 @@ We chose two sizes to test whether model capability affects the single-shot vs m
 
 ### Reranking: local cross-encoder
 
-NEBIUS does not offer reranker models. We run `cross-encoder/ms-marco-MiniLM-L-6-v2` locally on Nuvolos. This is the model taught in 🖥️ W10 Lecture.
-
-One team member found during PS2 that adding this cross-encoder on top of BM25 hybrid retrieval actually hurt ranking quality. We suspect this is because the model (22M parameters, trained on web search passages) is too small to improve on BM25 scores for domain-specific climate text. We plan to test this and report the result. If reranking does not help, we drop it and save the pipeline complexity.
+NEBIUS does not offer reranker models. We run `cross-encoder/ms-marco-MiniLM-L-6-v2` locally on Nuvolos. 
 
 ## Retrieval strategy
 
@@ -71,15 +69,9 @@ One team member found during PS2 that adding this cross-encoder on top of BM25 h
 
 We implement BM25 hybrid as our primary retrieval method: semantic similarity scores from the embedding model combined with BM25 keyword scores, weighted and merged into a single ranked list.
 
-**Alternative considered:** Pure semantic retrieval (embedding-only). We keep this as a fallback and will report Recall@5 for both configurations.
-
-**Alternative considered:** BM25 hybrid followed by cross-encoder reranking. As noted above, initial testing suggested the small cross-encoder hurts results on climate text. We test this formally and report the finding.
-
 ### Chunking strategy
 
-We use fixed-size (char-limit) chunking as our baseline. This was the simplest strategy and won the W10 NB00 benchmark when combined with reranking.
-
-**Alternative considered:** Heading-delimited chunking (Strategy B from the course). We may test this if fixed-size retrieval performs poorly on our Electrical Utilities PDFs, but we start simple.
+We use fixed-size (char-limit) chunking as our baseline. 
 
 ## Intermediate storage
 
