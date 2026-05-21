@@ -5,12 +5,14 @@ import re
 import statistics
 import time
 from pathlib import Path
+"""
+Document extraction pipeline for Project C.
 
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
-from pdf2image import convert_from_path
-from PIL import Image
+Reads:  data/raw/<company>/<pdf>
+Writes: data/extracted/<company>/<company>_<year>_elements.jsonl
+"""
+
+from __future__ import annotations
 from unstructured.partition.pdf import partition_pdf
 import sys
 from pathlib import Path

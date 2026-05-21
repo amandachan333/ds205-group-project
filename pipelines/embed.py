@@ -3,12 +3,12 @@ Embedding pipeline.
 
 Reads:   data/chunked/<company>/<doc_id>_chunks.jsonl
 Embeds:  Qwen/Qwen3-Embedding-8B via NEBIUS (OpenAI-compatible API)
-Stores:  SQLite + sqlite-vec at data/vector_store.db
+Stores:  SQLite at data/vector_store.db
 Logs:    Per-batch token spend to logs/token_spend.jsonl
 
 Schema (two tables):
     chunks            – chunk text and metadata
-    chunk_embeddings  – vec0 virtual table (sqlite-vec), 4096-dim float32
+    chunk_embeddings  – chunk_id + 4096-dim float32 blob
 
 NOTE — query-time embedding format:
     When embedding *query* strings for retrieval (not done here), Qwen3-Embedding
@@ -18,7 +18,7 @@ NOTE — query-time embedding format:
     See the retrieval script for the correct format.
 
 Dependencies:
-    pip install openai sqlite-vec python-dotenv
+    pip install openai python-dotenv
 
 Usage:
     python pipelines/embed.py                         # all companies
@@ -85,20 +85,12 @@ logger = logging.getLogger(__name__)
  
  
 # ---------------------------------------------------------------------------
-# sqlite-vec helpers
+# SQLite helpers
 # ---------------------------------------------------------------------------
  
 def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
-    """Load the sqlite-vec extension into *conn*."""
-    try:
-        import sqlite_vec  # type: ignore
-    except ImportError as exc:
-        raise ImportError(
-            "sqlite-vec is not installed.  Run: pip install sqlite-vec"
-        ) from exc
-    conn.enable_load_extension(True)
-    sqlite_vec.load(conn)
-    conn.enable_load_extension(False)
+    """Compatibility hook retained for older docs; no-op in this build."""
+    return None
  
  
 def _serialize_float32(vector: list[float]) -> bytes:
@@ -108,8 +100,8 @@ def _serialize_float32(vector: list[float]) -> bytes:
  
 def init_db(db_path: Path) -> sqlite3.Connection:
     """
-    Open (or create) the SQLite vector store, load sqlite-vec, and
-    ensure the schema exists.  Idempotent – safe to call on every run.
+    Open (or create) the SQLite vector store and ensure the schema exists.
+    Idempotent – safe to call on every run.
  
     Schema
     ------
@@ -117,14 +109,12 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         chunk_id TEXT PK, company, document_id, year, chunk_index,
         page_number, text, metadata (JSON string)
  
-    chunk_embeddings  (vec0 virtual table)
-        chunk_id TEXT PK, embedding float[4096]
+    chunk_embeddings
+        chunk_id TEXT PK, embedding BLOB (little-endian float32[4096])
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
- 
-    _load_sqlite_vec(conn)
  
     conn.executescript(f"""
         CREATE TABLE IF NOT EXISTS chunks (
@@ -138,9 +128,9 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             metadata    TEXT    NOT NULL
         );
  
-        CREATE VIRTUAL TABLE IF NOT EXISTS chunk_embeddings USING vec0(
+        CREATE TABLE IF NOT EXISTS chunk_embeddings (
             chunk_id  TEXT PRIMARY KEY,
-            embedding float[{EMBEDDING_DIM}]
+            embedding BLOB NOT NULL
         );
     """)
     conn.commit()
@@ -320,7 +310,7 @@ def _write_batch_to_db(
  
             conn.execute(
                 """
-                INSERT INTO chunks
+                INSERT OR REPLACE INTO chunks
                     (chunk_id, company, document_id, year, chunk_index,
                      page_number, text, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -338,7 +328,7 @@ def _write_batch_to_db(
             )
  
             conn.execute(
-                "INSERT INTO chunk_embeddings (chunk_id, embedding) VALUES (?, ?)",
+                "INSERT OR REPLACE INTO chunk_embeddings (chunk_id, embedding) VALUES (?, ?)",
                 (chunk_id, _serialize_float32(embedding)),
             )
  

@@ -1,12 +1,14 @@
 """
 db/database.py
+"""
+db/database.py
 
 All SQLite read/write functions for the benchmark pipeline.
-This is the only file in the codebase that imports sqlite3.
+This is the only file in the codebase that imports sqlite3 directly.
 Schema is defined in db/schema.sql and executed once via init_db().
 """
 
-import logging
+from __future__ import annotations
 import sqlite3
 from pathlib import Path
 

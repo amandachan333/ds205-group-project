@@ -41,8 +41,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 from rank_bm25 import BM25Okapi
 from openai import OpenAI
-import sqlite_vec
-
 from config import (
     DB_PATH,
     EMBED_COST_PER_1M_TOKENS,
@@ -222,9 +220,8 @@ GROUND_TRUTH: list[dict[str, Any]] = [
 # ---------------------------------------------------------------------------
  
 def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
-    conn.enable_load_extension(True)
-    sqlite_vec.load(conn)
-    conn.enable_load_extension(False)
+    """Compatibility hook retained for older docs; no-op in this build."""
+    return None
  
  
 def _deserialize_float32(blob: bytes) -> list[float]:

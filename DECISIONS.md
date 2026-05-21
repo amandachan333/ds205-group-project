@@ -59,8 +59,6 @@ Both models are available on NEBIUS and accessed via the OpenAI-compatible clien
 
 We chose two sizes to test whether model capability affects the single-shot vs multi-step comparison. The brief asks whether decomposition helps, and the answer may depend on whether the model is already capable enough to handle complex questions in a single pass.
 
-Commercial APIs (OpenAI, Anthropic, Gemini) are not permitted by the project brief.
-
 ### Reranking: local cross-encoder
 
 NEBIUS does not offer reranker models. We run `cross-encoder/ms-marco-MiniLM-L-6-v2` locally on Nuvolos. This is the model taught in 🖥️ W10 Lecture.
