@@ -665,10 +665,16 @@ def main() -> None:
         sys.exit(f"Vector store not found: {args.db}\nRun embed.py first.")
  
     conn = sqlite3.connect(args.db)
-    import sqlite_vec as _sv
-    conn.enable_load_extension(True)
-    _sv.load(conn)
-    conn.enable_load_extension(False)
+    # sqlite_vec is optional on some hosts (macOS without the extension installed).
+    # Try to load it but continue if unavailable — embeddings are stored as BLOBs.
+    try:
+        import sqlite_vec as _sv  # type: ignore
+        conn.enable_load_extension(True)
+        _sv.load(conn)
+        conn.enable_load_extension(False)
+        log.info("sqlite_vec extension loaded")
+    except Exception:
+        log.warning("sqlite_vec extension not available — proceeding without it")
  
     chunks = load_chunks(conn)
     if not chunks:
