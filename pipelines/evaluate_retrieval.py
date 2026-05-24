@@ -29,6 +29,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sqlite3
 import struct
 import sys
@@ -419,6 +420,43 @@ def hybrid_retrieve(
 def _normalise_doc_id(doc_id: str) -> str:
     """Lower-case, replace separators with underscores for fuzzy matching."""
     return doc_id.lower().replace("-", "_").replace(" ", "_")
+
+
+_DOC_TOKEN_STOPWORDS = {
+    "annual",
+    "corporate",
+    "csr",
+    "iar",
+    "pdf",
+    "report",
+    "sustainability",
+}
+
+
+def _doc_signature(doc_id: str) -> tuple[str | None, str | None]:
+    """Extract a coarse company/year signature from a document identifier."""
+    tokens = [token for token in re.split(r"[_\W]+", _normalise_doc_id(doc_id)) if token]
+    year = next((token for token in tokens if re.fullmatch(r"20\d{2}", token)), None)
+    company = next(
+        (token for token in tokens if token not in _DOC_TOKEN_STOPWORDS and token != year),
+        None,
+    )
+    return company, year
+
+
+def _signature_matches(left: tuple[str | None, str | None], right: tuple[str | None, str | None]) -> bool:
+    """Return True if two coarse document signatures are compatible."""
+    left_company, left_year = left
+    right_company, right_year = right
+
+    if left_company and right_company:
+        if left_company != right_company and left_company not in right_company and right_company not in left_company:
+            return False
+
+    if left_year and right_year and left_year != right_year:
+        return False
+
+    return True
  
  
 def chunk_matches_source(
@@ -439,11 +477,13 @@ def chunk_matches_source(
     """
     chunk_doc = _normalise_doc_id(chunk.get("document_id", ""))
     frag_norm = _normalise_doc_id(doc_fragment)
+    chunk_sig = _doc_signature(chunk.get("document_id", ""))
+    frag_sig = _doc_signature(doc_fragment)
  
     # Check document match bidirectionally — handles the case where ground truth
     # uses long names ("DEWA_Sustainability_Report_2024") but document_ids in the
     # DB are short ("DEWA_2024"), or vice versa.
-    if frag_norm not in chunk_doc and chunk_doc not in frag_norm:
+    if frag_norm not in chunk_doc and chunk_doc not in frag_norm and not _signature_matches(chunk_sig, frag_sig):
         return False
  
     # Check page match
