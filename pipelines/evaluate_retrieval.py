@@ -83,137 +83,51 @@ STOPWORDS = {
 }
 
 # ---------------------------------------------------------------------------
-# Ground truth — parsed from OUR_PROJECT_ground_truth.md
-# Each entry: question text + list of (document_id_fragment, page_number) pairs.
-#
-# Matching strategy: a retrieved chunk counts as a "hit" if:
-#   - its document_id contains the document_id_fragment (case-insensitive), AND
-#   - its page_number matches (or is within ±1 to allow for PDF vs. logical page
-#     offset differences — toggle STRICT_PAGE_MATCH to disable tolerance).
+# Ground truth
 # ---------------------------------------------------------------------------
+# Canonical questions live in evaluation/ground_truth.json.
+# The markdown file is kept as human-readable documentation.
+GROUND_TRUTH_PATH = Path(__file__).resolve().parents[1] / "evaluation" / "ground_truth.json"
 STRICT_PAGE_MATCH = False   # set True for exact page-number matching
- 
-GROUND_TRUTH: list[dict[str, Any]] = [
-    {
-        "question_id": "Q1",
-        "question": (
-            "Comparing Tenaga Nasional and DEWA's emissions intensity "
-            "(both reported in tCO2e/MWh) from 2019 to their most recent reported year, "
-            "which company achieved the larger reduction in absolute terms and in percentage "
-            "terms, and do the two measures agree on the ranking?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2020", 58),
-            ("DEWA_Sustainability_Report_2021", 66),
-            ("DEWA_Sustainability_Report_2021", 89),
-            ("DEWA_Sustainability_Report_2022", 57),
-            ("DEWA_Sustainability_Report_2024", 55),
-            ("DEWA_Sustainability_Report_2024", 56),
-            ("TNB_Sustainability_Report_2019",  17),
-            ("TNB_Sustainability_Report_2019",  48),
-            ("TNB_Sustainability_Report_2019",  86),
-            ("TNB_Sustainability_Report_2020",  48),
-            ("TNB_Sustainability_Report_2020",  74),
-            ("TNB_Sustainability_Report_2021",  98),
-            ("TNB_Sustainability_Report_2024",   5),
-            ("TNB_Sustainability_Report_2024",  30),
-            ("TNB_Sustainability_Report_2024", 173),
-        ],
-    },
-    {
-        "question_id": "Q2",
-        "question": (
-            "Given each company's most recent reported emissions intensity and their "
-            "respective net-zero target year, which company faces the steepest required "
-            "annual percentage reduction in emissions intensity to reach net-zero on schedule?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2024",    55),
-            ("DEWA_Sustainability_Report_2024",    56),
-            ("DEWA_Sustainability_Report_2022",    68),
-            ("DEWA_Sustainability_Report_2023",     4),
-            ("DEWA_Sustainability_Report_2024",     4),
-            ("TNB_Sustainability_Report_2024",      3),
-            ("TNB_Sustainability_Report_2024",     28),
-            ("TNB_Sustainability_Report_2024",    171),
-            ("TNB_Sustainability_Report_2021",      2),
-            ("CenterPoint_Energy_2024",            55),
-            ("CenterPoint_Energy_2024",           106),
-            ("CenterPoint_Energy_2024",            68),
-        ],
-    },
-    {
-        "question_id": "Q3",
-        "question": (
-            "Which company has the most consistent year-on-year reduction in emissions "
-            "intensity across all reported years, and which has the most volatile trajectory?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2021",  66),
-            ("DEWA_Sustainability_Report_2024",  56),
-            ("TNB_Sustainability_Report_2019",   48),
-            ("TNB_Sustainability_Report_2020",   48),
-            ("TNB_Sustainability_Report_2021",   98),
-            ("TNB_Sustainability_Report_2024",    5),
-            ("TNB_Sustainability_Report_2024",  173),
-            ("CenterPoint_Energy_2020",         100),
-            ("CenterPoint_Energy_2024",         106),
-        ],
-    },
-    {
-        "question_id": "Q4",
-        "question": (
-            "Across all three companies and all reported years, identify the single year "
-            "with the largest absolute increase in emissions intensity. What contextual "
-            "explanation, if any, does the company provide for this increase?"
-        ),
-        "sources": [
-            ("CenterPoint_Energy_2020",  100),
-            ("CenterPoint_Energy_2024",  106),
-            ("DEWA_Sustainability_Report_2024", 56),
-            ("TNB_Sustainability_Report_2024",   5),
-            ("TNB_Sustainability_Report_2024", 173),
-        ],
-    },
-    {
-        "question_id": "Q5",
-        "question": (
-            "What has changed in each company's stated emissions targets between its "
-            "2020 and 2023/2024 assessments?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2024",  54),
-            ("DEWA_Sustainability_Report_2022",   7),
-            ("TNB_Sustainability_Report_2022",   62),
-            ("TNB_Sustainability_Report_2024",   71),
-            ("CenterPoint_Energy_2024",          71),
-            ("CenterPoint_Energy_2022",          69),
-            ("CenterPoint_Energy_2020",          13),
-        ],
-    },
-    {
-        "question_id": "Q6",
-        "question": (
-            "For each of the three companies, compare the actual annual reduction in "
-            "emissions intensity achieved from their base year to their most recently "
-            "reported year against the annual reduction required to reach net-zero by "
-            "their stated target year. Based on this comparison, is each company's "
-            "net-zero commitment credible on current trajectory?"
-        ),
-        "sources": [
-            ("TNB_Sustainability_Report_2019",   48),
-            ("TNB_Sustainability_Report_2020",   48),
-            ("TNB_Sustainability_Report_2024",    5),
-            ("TNB_Sustainability_Report_2024",   22),
-            ("DEWA_Sustainability_Report_2021",  66),
-            ("DEWA_Sustainability_Report_2024",  56),
-            ("DEWA_Sustainability_Report_2024",   4),
-            ("CenterPoint_Energy_2020",         100),
-            ("CenterPoint_Energy_2024",         106),
-            ("CenterPoint_Energy_2024",          68),
-        ],
-    },
-]
+
+
+def load_ground_truth(path: Path) -> list[dict[str, Any]]:
+    """Load canonical ground-truth questions from JSON."""
+    if not path.exists():
+        sys.exit(f"Ground-truth file not found: {path}")
+
+    with path.open("r", encoding="utf-8") as fh:
+        data = json.load(fh)
+
+    if not isinstance(data, list):
+        sys.exit(f"Ground-truth file must contain a JSON list: {path}")
+
+    questions: list[dict[str, Any]] = []
+    for index, item in enumerate(data, 1):
+        if not isinstance(item, dict):
+            sys.exit(f"Ground-truth entry {index} must be a JSON object: {path}")
+
+        for key in ("question_id", "question", "sources"):
+            if key not in item:
+                sys.exit(f"Ground-truth entry {index} is missing '{key}': {path}")
+
+        sources = item["sources"]
+        if not isinstance(sources, list):
+            sys.exit(f"Ground-truth entry {index} must store 'sources' as a list: {path}")
+
+        normalized_sources: list[tuple[str, int]] = []
+        for source_index, source in enumerate(sources, 1):
+            if not isinstance(source, (list, tuple)) or len(source) != 2:
+                sys.exit(
+                    f"Ground-truth entry {index} source {source_index} must be a two-item list: {path}"
+                )
+            normalized_sources.append((str(source[0]), int(source[1])))
+
+        normalized = dict(item)
+        normalized["sources"] = normalized_sources
+        questions.append(normalized)
+
+    return questions
  
  
 # ---------------------------------------------------------------------------
@@ -687,7 +601,11 @@ def main() -> None:
         help="Require exact page number match (default: ±1 tolerance).",
     )
     parser.add_argument(
-        "--question", type=str, choices=["Q1","Q2","Q3","Q4","Q5","Q6"],
+        "--ground-truth", type=Path, default=GROUND_TRUTH_PATH,
+        help="Path to the canonical JSON ground-truth file.",
+    )
+    parser.add_argument(
+        "--question", type=str,
         help="Evaluate a single question only (useful for debugging).",
     )
     args = parser.parse_args()
@@ -728,9 +646,11 @@ def main() -> None:
     client = _make_client()
  
     # --- Select questions ---
-    questions = GROUND_TRUTH
+    questions = load_ground_truth(args.ground_truth)
     if args.question:
-        questions = [q for q in GROUND_TRUTH if q["question_id"] == args.question]
+        questions = [q for q in questions if q["question_id"] == args.question]
+        if not questions:
+            sys.exit(f"Question not found in ground truth: {args.question}")
  
     # --- Evaluate ---
     results = []
