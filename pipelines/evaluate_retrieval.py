@@ -36,6 +36,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+import re
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -93,6 +94,41 @@ STRICT_PAGE_MATCH = False   # set True for exact page-number matching
 
 def load_ground_truth(path: Path) -> list[dict[str, Any]]:
     """Load canonical ground-truth questions from JSON."""
+    md = path.parent / "ground_truth.md"
+
+    # If the markdown exists and is newer than JSON, re-parse and overwrite JSON.
+    if md.exists():
+        if path.exists():
+            try:
+                md_mtime = md.stat().st_mtime
+                json_mtime = path.stat().st_mtime
+            except OSError:
+                md_mtime = None
+                json_mtime = None
+            if md_mtime and json_mtime and md_mtime > json_mtime:
+                log.info("Markdown %s newer than JSON %s; regenerating JSON", md, path)
+                questions = load_ground_truth_from_md(md)
+                try:
+                    with path.open("w", encoding="utf-8") as fh:
+                        json.dump(questions, fh, ensure_ascii=False, indent=2)
+                    log.info("Wrote regenerated ground-truth JSON %s", path)
+                except OSError as e:
+                    log.warning("Failed to write ground-truth JSON %s: %s", path, e)
+                return questions
+        else:
+            # JSON missing but markdown present — create JSON from MD.
+            log.info("Ground-truth JSON missing; creating from markdown %s", md)
+            questions = load_ground_truth_from_md(md)
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("w", encoding="utf-8") as fh:
+                    json.dump(questions, fh, ensure_ascii=False, indent=2)
+                log.info("Wrote new ground-truth JSON %s", path)
+            except OSError as e:
+                log.warning("Failed to write ground-truth JSON %s: %s", path, e)
+            return questions
+
+    # Fallback: JSON exists (and either no markdown or markdown not newer)
     if not path.exists():
         sys.exit(f"Ground-truth file not found: {path}")
 
@@ -410,6 +446,69 @@ def chunk_matches_source(
         return int(chunk_page) == expected_page
     else:
         return abs(int(chunk_page) - expected_page) <= 1
+
+
+def load_ground_truth_from_md(md_path: Path) -> list[dict[str, Any]]:
+    """Parse a lightweight subset of the human `evaluation/ground_truth.md`.
+
+    This extracts question blocks, the question text, and any listed sources
+    that include a `chunk_id` or a `Document:` and `Page(s):` field. It is
+    intentionally forgiving and returns a list of dicts matching the in-code
+    `GROUND_TRUTH` structure: {question_id, question, sources: [(doc, page), ...]}.
+    """
+    results: list[dict[str, Any]] = []
+    cur: dict[str, Any] | None = None
+    with md_path.open("r", encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            m = re.match(r"^##\s+Question\s*(\d+)", line)
+            if m:
+                if cur:
+                    results.append(cur)
+                cur = {"question_id": f"Q{m.group(1)}", "question": "", "sources": []}
+                continue
+
+            if cur is None:
+                continue
+
+            if line.startswith("**Question**:"):
+                cur["question"] = line.split("**Question**:", 1)[1].strip()
+                continue
+
+            if line.startswith("- Document:"):
+                # Try to find an explicit chunk_id first
+                chunk_m = re.search(r'"chunk_id"\s*:\s*"([^\"]+)"', line)
+                doc_m = re.search(r"Document:\s*([^,]+),", line)
+                page_m = re.search(r"Page\(s\):\s*([0-9]+)", line)
+
+                if chunk_m:
+                    chunk_id = chunk_m.group(1)
+                    doc_fragment = chunk_id.split("_chunk_")[0]
+                elif doc_m:
+                    doc_fragment = doc_m.group(1).strip()
+                else:
+                    doc_fragment = ""
+
+                page = None
+                if page_m:
+                    try:
+                        page = int(page_m.group(1))
+                    except Exception:
+                        page = None
+                else:
+                    # fallback: find any number in the Page(s) span
+                    ps = re.search(r"Page\(s\):\s*([^,]+)", line)
+                    if ps:
+                        nums = re.findall(r"\d+", ps.group(1))
+                        if nums:
+                            page = int(nums[0])
+
+                if doc_fragment and page is not None:
+                    cur["sources"].append((doc_fragment, page))
+
+    if cur:
+        results.append(cur)
+    return results
  
  
 # ---------------------------------------------------------------------------
