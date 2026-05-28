@@ -311,14 +311,11 @@ def _log_generation_spend(
     """
     from datetime import datetime, timezone
 
-    rates = GENERATION_COST_RATES.get(model)
-    if rates is None:
-        input_rate = output_rate = GENERATION_COST_PER_1M_TOKENS
-    else:
-        input_rate = float(rates.get("input", GENERATION_COST_PER_1M_TOKENS))
-        output_rate = float(rates.get("output", GENERATION_COST_PER_1M_TOKENS))
-
-    cost = round((prompt_tokens * input_rate + completion_tokens * output_rate) / 1_000_000, 6)
+    input_rate, output_rate, cost = _calculate_generation_cost(
+        model,
+        prompt_tokens,
+        completion_tokens,
+    )
 
     record = {
         "record_type": "generation",
@@ -335,6 +332,23 @@ def _log_generation_spend(
     with TOKEN_SPEND_LOG.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     return cost
+
+
+def _calculate_generation_cost(
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> tuple[float, float, float]:
+    """Return (input_rate, output_rate, cost_usd) for a generation request."""
+    rates = GENERATION_COST_RATES.get(model)
+    if rates is None:
+        input_rate = output_rate = GENERATION_COST_PER_1M_TOKENS
+    else:
+        input_rate = float(rates.get("input", GENERATION_COST_PER_1M_TOKENS))
+        output_rate = float(rates.get("output", GENERATION_COST_PER_1M_TOKENS))
+
+    cost = round((prompt_tokens * input_rate + completion_tokens * output_rate) / 1_000_000, 6)
+    return input_rate, output_rate, cost
 
 
 def _get_cumulative_spend() -> float:
