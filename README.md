@@ -25,6 +25,18 @@ Tests whether decomposition with a smaller, cheaper model can match or beat a la
 >    ```
 > 4. Check the output in the `reports/` directory.
 
+## Single-Shot Baseline
+
+Run one question through the hybrid retriever + generation model:
+
+```bash
+PYTHONPATH=. python pipelines/single_shot_rag.py \
+	--question "Has DEWA’s carbon emission intensity for electricity improved consistently since 2010?" \
+	--model Qwen/Qwen3-30B-A3B
+```
+
+The script writes run logs to `logs/rag_runs.jsonl` and uses the existing vector store at `data/vector_store.db`.
+
 ## Configuration
 
 > **TODO**: Describe any configuration files, environment variables, or command-line arguments that control pipeline behaviour.
