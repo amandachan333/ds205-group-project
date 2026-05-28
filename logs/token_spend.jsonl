@@ -5548,3 +5548,15 @@
 {"record_type": "retrieval_eval_query", "timestamp": "2026-05-27T15:16:44.047259+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q4", "total_tokens": 54, "cost_usd": 1e-06}
 {"record_type": "retrieval_eval_query", "timestamp": "2026-05-27T15:16:44.340419+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q5", "total_tokens": 47, "cost_usd": 0.0}
 {"record_type": "retrieval_eval_query", "timestamp": "2026-05-27T15:16:45.272331+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q6", "total_tokens": 75, "cost_usd": 1e-06}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:43:18.623547+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q1", "total_tokens": 77, "cost_usd": 1e-06}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:43:18.954154+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q2", "total_tokens": 55, "cost_usd": 1e-06}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:43:19.184606+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q3", "total_tokens": 38, "cost_usd": 0.0}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:43:19.432521+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q4", "total_tokens": 37, "cost_usd": 0.0}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:43:19.633824+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q5", "total_tokens": 47, "cost_usd": 0.0}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:43:19.845402+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q6", "total_tokens": 75, "cost_usd": 1e-06}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:49:14.977143+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q1", "total_tokens": 77, "cost_usd": 1e-06}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:49:15.459377+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q2", "total_tokens": 55, "cost_usd": 1e-06}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:49:15.700651+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q3", "total_tokens": 38, "cost_usd": 0.0}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:49:15.915745+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q4", "total_tokens": 64, "cost_usd": 1e-06}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:49:16.131936+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q5", "total_tokens": 47, "cost_usd": 0.0}
+{"record_type": "retrieval_eval_query", "timestamp": "2026-05-28T11:49:16.351197+00:00", "model": "Qwen/Qwen3-Embedding-8B", "question_id": "Q6", "total_tokens": 75, "cost_usd": 1e-06}

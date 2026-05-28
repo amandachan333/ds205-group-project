@@ -3,94 +3,276 @@
     "question_id": "Q1",
     "question": "Comparing Tenaga Nasional and DEWA's emissions intensity (both reported in tCO2e/MWh) from 2019 to their most recent reported year, which company achieved the larger reduction in absolute terms and in percentage terms, and do the two measures agree on the ranking?",
     "sources": [
-      ["DEWA_Sustainability_Report_2020", 58],
-      ["DEWA_Sustainability_Report_2021", 66],
-      ["DEWA_Sustainability_Report_2021", 89],
-      ["DEWA_Sustainability_Report_2022", 57],
-      ["DEWA_Sustainability_Report_2024", 55],
-      ["DEWA_Sustainability_Report_2024", 56],
-      ["TNB_Sustainability_Report_2019", 17],
-      ["TNB_Sustainability_Report_2019", 48],
-      ["TNB_Sustainability_Report_2019", 86],
-      ["TNB_Sustainability_Report_2020", 48],
-      ["TNB_Sustainability_Report_2020", 74],
-      ["TNB_Sustainability_Report_2021", 98],
-      ["TNB_Sustainability_Report_2024", 5],
-      ["TNB_Sustainability_Report_2024", 30],
-      ["TNB_Sustainability_Report_2024", 173]
+      [
+        "DEWA_2020",
+        59
+      ],
+      [
+        "DEWA_2021",
+        66
+      ],
+      [
+        "DEWA_2021",
+        89
+      ],
+      [
+        "DEWA_2022",
+        57
+      ],
+      [
+        "DEWA_2024",
+        55
+      ],
+      [
+        "DEWA_2024",
+        56
+      ],
+      [
+        "TNB_2019",
+        50
+      ],
+      [
+        "TNB_2019",
+        88
+      ],
+      [
+        "TNB_2020",
+        76
+      ],
+      [
+        "TNB_2021",
+        98
+      ],
+      [
+        "TNB_2024",
+        5
+      ],
+      [
+        "TNB_2024",
+        30
+      ],
+      [
+        "TNB_2024",
+        173
+      ]
     ]
   },
   {
     "question_id": "Q2",
     "question": "Given each company's most recent reported emissions intensity and their respective net-zero target year, which company faces the steepest required annual percentage reduction in emissions intensity to reach net-zero on schedule?",
     "sources": [
-      ["DEWA_Sustainability_Report_2024", 55],
-      ["DEWA_Sustainability_Report_2024", 56],
-      ["DEWA_Sustainability_Report_2022", 68],
-      ["DEWA_Sustainability_Report_2023", 4],
-      ["DEWA_Sustainability_Report_2024", 4],
-      ["TNB_Sustainability_Report_2024", 3],
-      ["TNB_Sustainability_Report_2024", 28],
-      ["TNB_Sustainability_Report_2024", 171],
-      ["TNB_Sustainability_Report_2021", 2],
-      ["CenterPoint_Energy_2024", 55],
-      ["CenterPoint_Energy_2024", 106],
-      ["CenterPoint_Energy_2024", 68]
+      [
+        "DEWA_2024",
+        55
+      ],
+      [
+        "DEWA_2024",
+        56
+      ],
+      [
+        "DEWA_2022",
+        68
+      ],
+      [
+        "DEWA Sustainability Report 2023",
+        4
+      ],
+      [
+        "DEWA_2024",
+        4
+      ],
+      [
+        "TNB_2024",
+        5
+      ],
+      [
+        "TNB_2024",
+        30
+      ],
+      [
+        "TNB_2024",
+        173
+      ],
+      [
+        "TNB Sustainability Report 2021",
+        2
+      ],
+      [
+        "TNB_2023",
+        17
+      ],
+      [
+        "TNB_2024",
+        22
+      ],
+      [
+        "Centerpoint_2024",
+        106
+      ],
+      [
+        "Centerpoint_2024",
+        67
+      ],
+      [
+        "Centerpoint_2023",
+        3
+      ],
+      [
+        "Centerpoint_2022",
+        65
+      ]
     ]
   },
   {
     "question_id": "Q3",
-    "question": "Which company has the most consistent year-on-year reduction in emissions intensity across all reported years, and which has the most volatile trajectory?",
+    "question": "Has Tenaga set intermediate emissions reduction targets between now and its long-term target year? What are they?",
     "sources": [
-      ["DEWA_Sustainability_Report_2021", 66],
-      ["DEWA_Sustainability_Report_2024", 56],
-      ["TNB_Sustainability_Report_2019", 48],
-      ["TNB_Sustainability_Report_2020", 48],
-      ["TNB_Sustainability_Report_2021", 98],
-      ["TNB_Sustainability_Report_2024", 5],
-      ["TNB_Sustainability_Report_2024", 173],
-      ["CenterPoint_Energy_2020", 100],
-      ["CenterPoint_Energy_2024", 106]
+      [
+        "TNB_2024",
+        30
+      ],
+      [
+        "TNB_IAR_2024.pdf",
+        84
+      ],
+      [
+        "TNB_2023",
+        26
+      ],
+      [
+        "TNB_2022",
+        60
+      ],
+      [
+        "TNB_IAR_2022.pdf",
+        63
+      ],
+      [
+        "TNB_2021",
+        9
+      ],
+      [
+        "TNB_2021",
+        16
+      ],
+      [
+        "TNB_IAR_2021.pdf",
+        28
+      ]
     ]
   },
   {
     "question_id": "Q4",
-    "question": "Across all three companies and all reported years, identify the single year with the largest absolute increase in emissions intensity. What contextual explanation, if any, does the company provide for this increase?",
+    "question": "Has DEWA’s carbon emission intensity for electricity (reported in tCO₂e/MWh) improved consistently since 2010, and what was the net reduction from 2010 to 2024?",
     "sources": [
-      ["CenterPoint_Energy_2020", 100],
-      ["CenterPoint_Energy_2024", 106],
-      ["DEWA_Sustainability_Report_2024", 56],
-      ["TNB_Sustainability_Report_2024", 5],
-      ["TNB_Sustainability_Report_2024", 173]
+      [
+        "DEWA_2024",
+        56
+      ],
+      [
+        "DEWA_2023",
+        56
+      ],
+      [
+        "DEWA_2022",
+        57
+      ],
+      [
+        "DEWA_2021",
+        89
+      ],
+      [
+        "DEWA_2020",
+        78
+      ],
+      [
+        "DEWA_2019",
+        31
+      ],
+      [
+        "DEWA_2016",
+        69
+      ]
     ]
   },
   {
     "question_id": "Q5",
     "question": "What has changed in each company's stated emissions targets between its 2020 and 2023/2024 assessments?",
     "sources": [
-      ["DEWA_Sustainability_Report_2024", 54],
-      ["DEWA_Sustainability_Report_2022", 7],
-      ["TNB_Sustainability_Report_2022", 62],
-      ["TNB_Sustainability_Report_2024", 71],
-      ["CenterPoint_Energy_2024", 71],
-      ["CenterPoint_Energy_2022", 69],
-      ["CenterPoint_Energy_2020", 13]
+      [
+        "DEWA_2024",
+        54
+      ],
+      [
+        "DEWA_2022",
+        7
+      ],
+      [
+        "TNB_2020",
+        7
+      ],
+      [
+        "TNB_2024",
+        30
+      ],
+      [
+        "Centerpoint_2024",
+        67
+      ],
+      [
+        "Centerpoint_2022",
+        69
+      ],
+      [
+        "Centerpoint_2020",
+        4
+      ]
     ]
   },
   {
     "question_id": "Q6",
     "question": "For each of the three companies, compare the actual annual reduction in emissions intensity achieved from their base year to their most recently reported year against the annual reduction required to reach net-zero by their stated target year. Based on this comparison, is each company's net-zero commitment credible on current trajectory?",
     "sources": [
-      ["TNB_Sustainability_Report_2019", 48],
-      ["TNB_Sustainability_Report_2020", 48],
-      ["TNB_Sustainability_Report_2024", 5],
-      ["TNB_Sustainability_Report_2024", 22],
-      ["DEWA_Sustainability_Report_2021", 66],
-      ["DEWA_Sustainability_Report_2024", 56],
-      ["DEWA_Sustainability_Report_2024", 4],
-      ["CenterPoint_Energy_2020", 100],
-      ["CenterPoint_Energy_2024", 106],
-      ["CenterPoint_Energy_2024", 68]
+      [
+        "TNB_2019",
+        50
+      ],
+      [
+        "TNB_2020",
+        48
+      ],
+      [
+        "TNB_2024",
+        5
+      ],
+      [
+        "TNB_2024",
+        22
+      ],
+      [
+        "DEWA_2021",
+        89
+      ],
+      [
+        "DEWA_2024",
+        56
+      ],
+      [
+        "DEWA_2024",
+        4
+      ],
+      [
+        "Centerpoint_2020",
+        100
+      ],
+      [
+        "Centerpoint_2024",
+        106
+      ],
+      [
+        "Centerpoint_2024",
+        68
+      ]
     ]
   }
 ]
