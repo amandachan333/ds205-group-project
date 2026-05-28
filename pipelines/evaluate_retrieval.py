@@ -29,12 +29,14 @@ import argparse
 import json
 import logging
 import os
+import re
 import sqlite3
 import struct
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+import re
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -82,137 +84,86 @@ STOPWORDS = {
 }
 
 # ---------------------------------------------------------------------------
-# Ground truth — parsed from OUR_PROJECT_ground_truth.md
-# Each entry: question text + list of (document_id_fragment, page_number) pairs.
-#
-# Matching strategy: a retrieved chunk counts as a "hit" if:
-#   - its document_id contains the document_id_fragment (case-insensitive), AND
-#   - its page_number matches (or is within ±1 to allow for PDF vs. logical page
-#     offset differences — toggle STRICT_PAGE_MATCH to disable tolerance).
+# Ground truth
 # ---------------------------------------------------------------------------
+# Canonical questions live in evaluation/ground_truth.json.
+# The markdown file is kept as human-readable documentation.
+GROUND_TRUTH_PATH = Path(__file__).resolve().parents[1] / "evaluation" / "ground_truth.json"
 STRICT_PAGE_MATCH = False   # set True for exact page-number matching
- 
-GROUND_TRUTH: list[dict[str, Any]] = [
-    {
-        "question_id": "Q1",
-        "question": (
-            "Comparing Tenaga Nasional and DEWA's emissions intensity "
-            "(both reported in tCO2e/MWh) from 2019 to their most recent reported year, "
-            "which company achieved the larger reduction in absolute terms and in percentage "
-            "terms, and do the two measures agree on the ranking?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2020", 58),
-            ("DEWA_Sustainability_Report_2021", 66),
-            ("DEWA_Sustainability_Report_2021", 89),
-            ("DEWA_Sustainability_Report_2022", 57),
-            ("DEWA_Sustainability_Report_2024", 55),
-            ("DEWA_Sustainability_Report_2024", 56),
-            ("TNB_Sustainability_Report_2019",  17),
-            ("TNB_Sustainability_Report_2019",  48),
-            ("TNB_Sustainability_Report_2019",  86),
-            ("TNB_Sustainability_Report_2020",  48),
-            ("TNB_Sustainability_Report_2020",  74),
-            ("TNB_Sustainability_Report_2021",  98),
-            ("TNB_Sustainability_Report_2024",   5),
-            ("TNB_Sustainability_Report_2024",  30),
-            ("TNB_Sustainability_Report_2024", 173),
-        ],
-    },
-    {
-        "question_id": "Q2",
-        "question": (
-            "Given each company's most recent reported emissions intensity and their "
-            "respective net-zero target year, which company faces the steepest required "
-            "annual percentage reduction in emissions intensity to reach net-zero on schedule?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2024",    55),
-            ("DEWA_Sustainability_Report_2024",    56),
-            ("DEWA_Sustainability_Report_2022",    68),
-            ("DEWA_Sustainability_Report_2023",     4),
-            ("DEWA_Sustainability_Report_2024",     4),
-            ("TNB_Sustainability_Report_2024",      3),
-            ("TNB_Sustainability_Report_2024",     28),
-            ("TNB_Sustainability_Report_2024",    171),
-            ("TNB_Sustainability_Report_2021",      2),
-            ("CenterPoint_Energy_2024",            55),
-            ("CenterPoint_Energy_2024",           106),
-            ("CenterPoint_Energy_2024",            68),
-        ],
-    },
-    {
-        "question_id": "Q3",
-        "question": (
-            "Which company has the most consistent year-on-year reduction in emissions "
-            "intensity across all reported years, and which has the most volatile trajectory?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2021",  66),
-            ("DEWA_Sustainability_Report_2024",  56),
-            ("TNB_Sustainability_Report_2019",   48),
-            ("TNB_Sustainability_Report_2020",   48),
-            ("TNB_Sustainability_Report_2021",   98),
-            ("TNB_Sustainability_Report_2024",    5),
-            ("TNB_Sustainability_Report_2024",  173),
-            ("CenterPoint_Energy_2020",         100),
-            ("CenterPoint_Energy_2024",         106),
-        ],
-    },
-    {
-        "question_id": "Q4",
-        "question": (
-            "Across all three companies and all reported years, identify the single year "
-            "with the largest absolute increase in emissions intensity. What contextual "
-            "explanation, if any, does the company provide for this increase?"
-        ),
-        "sources": [
-            ("CenterPoint_Energy_2020",  100),
-            ("CenterPoint_Energy_2024",  106),
-            ("DEWA_Sustainability_Report_2024", 56),
-            ("TNB_Sustainability_Report_2024",   5),
-            ("TNB_Sustainability_Report_2024", 173),
-        ],
-    },
-    {
-        "question_id": "Q5",
-        "question": (
-            "What has changed in each company's stated emissions targets between its "
-            "2020 and 2023/2024 assessments?"
-        ),
-        "sources": [
-            ("DEWA_Sustainability_Report_2024",  54),
-            ("DEWA_Sustainability_Report_2022",   7),
-            ("TNB_Sustainability_Report_2022",   62),
-            ("TNB_Sustainability_Report_2024",   71),
-            ("CenterPoint_Energy_2024",          71),
-            ("CenterPoint_Energy_2022",          69),
-            ("CenterPoint_Energy_2020",          13),
-        ],
-    },
-    {
-        "question_id": "Q6",
-        "question": (
-            "For each of the three companies, compare the actual annual reduction in "
-            "emissions intensity achieved from their base year to their most recently "
-            "reported year against the annual reduction required to reach net-zero by "
-            "their stated target year. Based on this comparison, is each company's "
-            "net-zero commitment credible on current trajectory?"
-        ),
-        "sources": [
-            ("TNB_Sustainability_Report_2019",   48),
-            ("TNB_Sustainability_Report_2020",   48),
-            ("TNB_Sustainability_Report_2024",    5),
-            ("TNB_Sustainability_Report_2024",   22),
-            ("DEWA_Sustainability_Report_2021",  66),
-            ("DEWA_Sustainability_Report_2024",  56),
-            ("DEWA_Sustainability_Report_2024",   4),
-            ("CenterPoint_Energy_2020",         100),
-            ("CenterPoint_Energy_2024",         106),
-            ("CenterPoint_Energy_2024",          68),
-        ],
-    },
-]
+
+
+def load_ground_truth(path: Path) -> list[dict[str, Any]]:
+    """Load canonical ground-truth questions from JSON."""
+    md = path.parent / "ground_truth.md"
+
+    # If the markdown exists and is newer than JSON, re-parse and overwrite JSON.
+    if md.exists():
+        if path.exists():
+            try:
+                md_mtime = md.stat().st_mtime
+                json_mtime = path.stat().st_mtime
+            except OSError:
+                md_mtime = None
+                json_mtime = None
+            if md_mtime and json_mtime and md_mtime > json_mtime:
+                log.info("Markdown %s newer than JSON %s; regenerating JSON", md, path)
+                questions = load_ground_truth_from_md(md)
+                try:
+                    with path.open("w", encoding="utf-8") as fh:
+                        json.dump(questions, fh, ensure_ascii=False, indent=2)
+                    log.info("Wrote regenerated ground-truth JSON %s", path)
+                except OSError as e:
+                    log.warning("Failed to write ground-truth JSON %s: %s", path, e)
+                return questions
+        else:
+            # JSON missing but markdown present — create JSON from MD.
+            log.info("Ground-truth JSON missing; creating from markdown %s", md)
+            questions = load_ground_truth_from_md(md)
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("w", encoding="utf-8") as fh:
+                    json.dump(questions, fh, ensure_ascii=False, indent=2)
+                log.info("Wrote new ground-truth JSON %s", path)
+            except OSError as e:
+                log.warning("Failed to write ground-truth JSON %s: %s", path, e)
+            return questions
+
+    # Fallback: JSON exists (and either no markdown or markdown not newer)
+    if not path.exists():
+        sys.exit(f"Ground-truth file not found: {path}")
+
+    with path.open("r", encoding="utf-8") as fh:
+        data = json.load(fh)
+
+    if not isinstance(data, list):
+        sys.exit(f"Ground-truth file must contain a JSON list: {path}")
+
+    questions: list[dict[str, Any]] = []
+    for index, item in enumerate(data, 1):
+        if not isinstance(item, dict):
+            sys.exit(f"Ground-truth entry {index} must be a JSON object: {path}")
+
+        for key in ("question_id", "question", "sources"):
+            if key not in item:
+                sys.exit(f"Ground-truth entry {index} is missing '{key}': {path}")
+
+        sources = item["sources"]
+        if not isinstance(sources, list):
+            sys.exit(f"Ground-truth entry {index} must store 'sources' as a list: {path}")
+
+        normalized_sources: list[tuple[str, int]] = []
+        for source_index, source in enumerate(sources, 1):
+            if not isinstance(source, (list, tuple)) or len(source) != 2:
+                sys.exit(
+                    f"Ground-truth entry {index} source {source_index} must be a two-item list: {path}"
+                )
+            normalized_sources.append((str(source[0]), int(source[1])))
+
+        normalized = dict(item)
+        normalized["sources"] = normalized_sources
+        questions.append(normalized)
+
+    return questions
  
  
 # ---------------------------------------------------------------------------
@@ -419,6 +370,43 @@ def hybrid_retrieve(
 def _normalise_doc_id(doc_id: str) -> str:
     """Lower-case, replace separators with underscores for fuzzy matching."""
     return doc_id.lower().replace("-", "_").replace(" ", "_")
+
+
+_DOC_TOKEN_STOPWORDS = {
+    "annual",
+    "corporate",
+    "csr",
+    "iar",
+    "pdf",
+    "report",
+    "sustainability",
+}
+
+
+def _doc_signature(doc_id: str) -> tuple[str | None, str | None]:
+    """Extract a coarse company/year signature from a document identifier."""
+    tokens = [token for token in re.split(r"[_\W]+", _normalise_doc_id(doc_id)) if token]
+    year = next((token for token in tokens if re.fullmatch(r"20\d{2}", token)), None)
+    company = next(
+        (token for token in tokens if token not in _DOC_TOKEN_STOPWORDS and token != year),
+        None,
+    )
+    return company, year
+
+
+def _signature_matches(left: tuple[str | None, str | None], right: tuple[str | None, str | None]) -> bool:
+    """Return True if two coarse document signatures are compatible."""
+    left_company, left_year = left
+    right_company, right_year = right
+
+    if left_company and right_company:
+        if left_company != right_company and left_company not in right_company and right_company not in left_company:
+            return False
+
+    if left_year and right_year and left_year != right_year:
+        return False
+
+    return True
  
  
 def chunk_matches_source(
@@ -439,11 +427,13 @@ def chunk_matches_source(
     """
     chunk_doc = _normalise_doc_id(chunk.get("document_id", ""))
     frag_norm = _normalise_doc_id(doc_fragment)
+    chunk_sig = _doc_signature(chunk.get("document_id", ""))
+    frag_sig = _doc_signature(doc_fragment)
  
     # Check document match bidirectionally — handles the case where ground truth
     # uses long names ("DEWA_Sustainability_Report_2024") but document_ids in the
     # DB are short ("DEWA_2024"), or vice versa.
-    if frag_norm not in chunk_doc and chunk_doc not in frag_norm:
+    if frag_norm not in chunk_doc and chunk_doc not in frag_norm and not _signature_matches(chunk_sig, frag_sig):
         return False
  
     # Check page match
@@ -456,6 +446,69 @@ def chunk_matches_source(
         return int(chunk_page) == expected_page
     else:
         return abs(int(chunk_page) - expected_page) <= 1
+
+
+def load_ground_truth_from_md(md_path: Path) -> list[dict[str, Any]]:
+    """Parse a lightweight subset of the human `evaluation/ground_truth.md`.
+
+    This extracts question blocks, the question text, and any listed sources
+    that include a `chunk_id` or a `Document:` and `Page(s):` field. It is
+    intentionally forgiving and returns a list of dicts matching the in-code
+    `GROUND_TRUTH` structure: {question_id, question, sources: [(doc, page), ...]}.
+    """
+    results: list[dict[str, Any]] = []
+    cur: dict[str, Any] | None = None
+    with md_path.open("r", encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            m = re.match(r"^##\s+Question\s*(\d+)", line)
+            if m:
+                if cur:
+                    results.append(cur)
+                cur = {"question_id": f"Q{m.group(1)}", "question": "", "sources": []}
+                continue
+
+            if cur is None:
+                continue
+
+            if line.startswith("**Question**:"):
+                cur["question"] = line.split("**Question**:", 1)[1].strip()
+                continue
+
+            if line.startswith("- Document:"):
+                # Try to find an explicit chunk_id first
+                chunk_m = re.search(r'"chunk_id"\s*:\s*"([^\"]+)"', line)
+                doc_m = re.search(r"Document:\s*([^,]+),", line)
+                page_m = re.search(r"Page\(s\):\s*([0-9]+)", line)
+
+                if chunk_m:
+                    chunk_id = chunk_m.group(1)
+                    doc_fragment = chunk_id.split("_chunk_")[0]
+                elif doc_m:
+                    doc_fragment = doc_m.group(1).strip()
+                else:
+                    doc_fragment = ""
+
+                page = None
+                if page_m:
+                    try:
+                        page = int(page_m.group(1))
+                    except Exception:
+                        page = None
+                else:
+                    # fallback: find any number in the Page(s) span
+                    ps = re.search(r"Page\(s\):\s*([^,]+)", line)
+                    if ps:
+                        nums = re.findall(r"\d+", ps.group(1))
+                        if nums:
+                            page = int(nums[0])
+
+                if doc_fragment and page is not None:
+                    cur["sources"].append((doc_fragment, page))
+
+    if cur:
+        results.append(cur)
+    return results
  
  
 # ---------------------------------------------------------------------------
@@ -647,7 +700,11 @@ def main() -> None:
         help="Require exact page number match (default: ±1 tolerance).",
     )
     parser.add_argument(
-        "--question", type=str, choices=["Q1","Q2","Q3","Q4","Q5","Q6"],
+        "--ground-truth", type=Path, default=GROUND_TRUTH_PATH,
+        help="Path to the canonical JSON ground-truth file.",
+    )
+    parser.add_argument(
+        "--question", type=str,
         help="Evaluate a single question only (useful for debugging).",
     )
     args = parser.parse_args()
@@ -688,9 +745,11 @@ def main() -> None:
     client = _make_client()
  
     # --- Select questions ---
-    questions = GROUND_TRUTH
+    questions = load_ground_truth(args.ground_truth)
     if args.question:
-        questions = [q for q in GROUND_TRUTH if q["question_id"] == args.question]
+        questions = [q for q in questions if q["question_id"] == args.question]
+        if not questions:
+            sys.exit(f"Question not found in ground truth: {args.question}")
  
     # --- Evaluate ---
     results = []
