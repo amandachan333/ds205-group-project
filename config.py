@@ -40,6 +40,18 @@ EMBED_RETRY_SLEEP_S: float = 5.0
 # NEBIUS pricing for Qwen3-Embedding-8B (USD per 1M tokens, input only)
 EMBED_COST_PER_1M_TOKENS: float = 0.01
 
+# NEBIUS generation pricing (USD per 1M tokens) — set conservatively; override via env if needed
+# Legacy fallback rate (used if a model isn't listed in GENERATION_COST_RATES)
+GENERATION_COST_PER_1M_TOKENS: float = float(os.environ.get("GENERATION_COST_PER_1M_TOKENS", "0.02"))
+
+# Per-model generation cost rates (USD per 1M tokens). Split into input/prompt and
+# output/completion rates so we can compute cost precisely: cost = prompt_tokens*input_rate + completion_tokens*output_rate
+GENERATION_COST_RATES = {
+    # model: {input: USD_per_1M, output: USD_per_1M}
+    "Qwen/Qwen3-30B-A3B-Instruct-2507": {"input": 0.10, "output": 0.30},
+    "Qwen/Qwen3-235B-A22B-Instruct-2507": {"input": 0.20, "output": 0.60},
+}
+
 # NEBIUS base URL
 NEBIUS_BASE_URL: str = os.environ.get(
     "NEBIUS_BASE_URL", "https://api.studio.nebius.com/v1/"
