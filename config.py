@@ -48,8 +48,8 @@ GENERATION_COST_PER_1M_TOKENS: float = float(os.environ.get("GENERATION_COST_PER
 # output/completion rates so we can compute cost precisely: cost = prompt_tokens*input_rate + completion_tokens*output_rate
 GENERATION_COST_RATES = {
     # model: {input: USD_per_1M, output: USD_per_1M}
-    "Qwen/Qwen3-30B-A3B": {"input": 0.10, "output": 0.30},
-    "Qwen/Qwen3-235B-A22B-Instruct": {"input": 0.20, "output": 0.60},
+    "Qwen/Qwen3-30B-A3B-Instruct-2507": {"input": 0.10, "output": 0.30},
+    "Qwen/Qwen3-235B-A22B-Instruct-2507": {"input": 0.20, "output": 0.60},
 }
 
 # NEBIUS base URL

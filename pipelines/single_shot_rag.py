@@ -58,10 +58,10 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 DEFAULT_TOP_N = 20
-DEFAULT_CONTEXT_CHUNKS = 6
+DEFAULT_CONTEXT_CHUNKS = 10
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
-DEFAULT_MODEL = os.environ.get("RAG_GENERATION_MODEL", "Qwen/Qwen3-30B-A3B")
+DEFAULT_MODEL = os.environ.get("RAG_GENERATION_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507")
 RAG_RUNS_LOG = LOG_DIR / "rag_runs.jsonl"
 EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-8B"
 EMBEDDING_DIM = 4096
@@ -71,6 +71,12 @@ STOPWORDS = {
     "what", "are", "the", "for", "is", "a", "an", "of", "in",
     "to", "how", "much", "did", "this", "that", "and", "or", "by",
     "which", "their", "each", "between", "from", "its", "both",
+}
+
+COMPANY_ALIASES = {
+    "TNB": ("tnb", "tenaga nasional"),
+    "DEWA": ("dewa",),
+    "Centerpoint": ("centerpoint", "center point"),
 }
 
 SINGLE_SHOT_SYSTEM_PROMPT = (
@@ -286,6 +292,41 @@ def _format_context(chunks: list[dict], max_chars_per_chunk: int) -> str:
         )
 
     return "\n\n".join(blocks)
+
+
+def _mentioned_companies(question: str) -> list[str]:
+    question_lower = question.lower()
+    mentioned: list[str] = []
+    for company, aliases in COMPANY_ALIASES.items():
+        if any(alias in question_lower for alias in aliases):
+            mentioned.append(company)
+    return mentioned
+
+
+def _select_context_chunks(question: str, retrieved: list[dict], max_chunks: int) -> list[dict]:
+    mentioned = _mentioned_companies(question)
+    if len(mentioned) < 2:
+        return retrieved[:max_chunks]
+
+    selected: list[dict] = []
+    seen_ids: set[str] = set()
+
+    for company in mentioned:
+        for chunk in retrieved:
+            if chunk.get("company") == company and chunk.get("chunk_id") not in seen_ids:
+                selected.append(chunk)
+                seen_ids.add(chunk["chunk_id"])
+                break
+
+    for chunk in retrieved:
+        chunk_id = chunk.get("chunk_id")
+        if chunk_id not in seen_ids:
+            selected.append(chunk)
+            seen_ids.add(chunk_id)
+        if len(selected) >= max_chunks:
+            break
+
+    return selected[:max_chunks]
 
 
 def _extract_citations(answer: str) -> list[str]:
@@ -513,7 +554,7 @@ def main() -> None:
             bm25_weight=args.bm25_weight,
             rrf_k=args.rrf_k,
         )
-    context_chunks = retrieved[: args.context_chunks]
+    context_chunks = _select_context_chunks(args.question, retrieved, args.context_chunks)
     context = _format_context(context_chunks, args.max_chars_per_chunk)
 
     if args.verbose:
