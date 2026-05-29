@@ -77,8 +77,8 @@ def make_client() -> OpenAI:
 
 
 _BM25_TOKEN_RE = re.compile(r"\w+", re.UNICODE)
- 
- 
+
+
 def remove_stopwords(text: str) -> list[str]:
     """
     Tokenise text for BM25: lowercase, split on word boundaries (so
@@ -333,7 +333,7 @@ def load_index(db_path: Path) -> RetrievalIndex:
     """Load chunks and embeddings from the vector store into an in-memory index."""
     if not db_path.exists():
         sys.exit(f"Vector store not found: {db_path}\nRun embed.py first.")
- 
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     _load_sqlite_vec(conn)
@@ -341,7 +341,7 @@ def load_index(db_path: Path) -> RetrievalIndex:
         chunks = load_chunks(conn)
         if not chunks:
             sys.exit("No chunks found in vector store.")
- 
+
         # Boilerplate filter: removes running-header chunks from the index.
         # Disabled by default. Empirical testing under the (then-broken)
         # naive-split BM25 tokeniser found this regressed TNB 2024 retrieval;
@@ -349,7 +349,7 @@ def load_index(db_path: Path) -> RetrievalIndex:
         # flag below to True to re-enable, then run the eval script to
         # measure. See DECISIONS.md for the write-up.
         ENABLE_BOILERPLATE_FILTER = False
- 
+
         if ENABLE_BOILERPLATE_FILTER:
             n_before = len(chunks)
             chunks, n_dropped = filter_boilerplate_chunks(chunks)
@@ -358,12 +358,12 @@ def load_index(db_path: Path) -> RetrievalIndex:
                     "Filtered out %d boilerplate chunks (%.1f%% of corpus); %d remain",
                     n_dropped, 100 * n_dropped / n_before, len(chunks),
                 )
- 
+
         chunk_ids = [chunk["chunk_id"] for chunk in chunks]
         embeddings_map = load_embeddings(conn, chunk_ids)
     finally:
         conn.close()
- 
+
     return build_index(chunks, embeddings_map)
 
 
@@ -482,6 +482,56 @@ def mentioned_companies(question: str) -> list[str]:
     return mentioned
 
 
+# ---------------------------------------------------------------------------
+# Value-content patterns (used to prefer value-bearing chunks at selection)
+# ---------------------------------------------------------------------------
+#
+# Many of our sub-questions ask for a specific quantity ("emissions intensity
+# in 2024", "net-zero target year", "percentage reduction"). Without help,
+# `select_context_chunks` will reserve the first chunk that matches the
+# (company, year) constraint, which is often a long target-discussion chunk
+# that mentions the topic but contains no actual numbers. The patterns below
+# detect chunks that contain the *kind of value* a sub-question is asking for.
+# `_has_value_pattern` ties the patterns to keywords in the question so the
+# check is a no-op for questions that aren't value-seeking.
+
+# Decimal-near-intensity-context: matches "0.5571 tCO2e/MWh", "intensity ... 0.4045",
+# "tCO2e/MWh ... 2024: 0.5571", etc. Used when the question asks for an emissions
+# intensity figure.
+_INTENSITY_VALUE_RE = re.compile(
+    r"\b\d+\.\d{2,4}\b[^.\n]{0,80}?(?:intensity|tco[2\u2082]?\s*e?\s*/?\s*mwh)"
+    r"|(?:intensity|tco[2\u2082]?\s*e?\s*/?\s*mwh)[^.\n]{0,80}?\b\d+\.\d{2,4}\b",
+    re.IGNORECASE,
+)
+
+# Explicit percentage value (e.g. "35%", "5% annually"). Used when the question
+# asks for a percentage reduction or annual rate.
+_PERCENTAGE_VALUE_RE = re.compile(r"\b\d+(?:\.\d+)?\s*%")
+
+# Net-zero / long-term target year mentioned with an actual year nearby.
+_TARGET_YEAR_RE = re.compile(
+    r"\bnet[ -]?zero[^.\n]{0,80}\b(?:2030|2035|2040|2045|2050|2060)\b"
+    r"|\b(?:2030|2035|2040|2045|2050|2060)\b[^.\n]{0,80}?\bnet[ -]?zero",
+    re.IGNORECASE,
+)
+
+
+def _has_value_pattern(text: str, question: str) -> bool:
+    """
+    Heuristic: does `text` look like it contains the kind of value `question`
+    is asking for? Returns False if no trigger word is present in `question`,
+    making this a no-op for non-value-seeking sub-questions.
+    """
+    q = question.lower()
+    if "intensity" in q and _INTENSITY_VALUE_RE.search(text):
+        return True
+    if ("net zero" in q or "net-zero" in q or "target year" in q) and _TARGET_YEAR_RE.search(text):
+        return True
+    if ("percentage" in q or "reduction" in q or "annual reduction" in q) and _PERCENTAGE_VALUE_RE.search(text):
+        return True
+    return False
+
+
 def mentioned_years(question: str) -> list[int]:
     """
     Return any 20xx years explicitly named in the question, preserving
@@ -509,19 +559,22 @@ def select_context_chunks(question: str, retrieved: list[dict], max_chunks: int)
     """
     Select up to `max_chunks` chunks for the prompt.
 
-    Two reservation passes run before filling the remaining slots by rank:
+    Three reservation passes run before filling the remaining slots by rank:
 
-    1. Year boost: for every year mentioned in the question, reserve at
-       least one retrieved chunk whose `year` matches. When companies are
-       also mentioned, reserve `(company, year)` pairs preferentially so
-       multi-company-multi-year comparative queries get balanced coverage.
+    1. Value-aware year boost: for every year (and optionally company) the
+       question mentions, prefer chunks that match the (company, year) AND
+       contain a value pattern relevant to the question (an intensity
+       figure, a net-zero target year, a percentage value, etc.). Falls
+       back to the plain (company, year) match if no value-bearing chunk
+       is in the candidate set.
     2. Company boost: when two or more companies are mentioned, ensure
        each named company has at least one chunk in the prompt even if
        it wasn't already covered by the year-boost step.
+    3. Rank fill: remaining slots filled in retrieval order.
 
     For queries with no mentioned year and zero or one mentioned company
-    (e.g. simple sub-questions about a single fact) both passes are
-    no-ops and the function returns retrieved[:max_chunks].
+    (e.g. simple sub-questions about a single fact) all passes are
+    no-ops except the rank fill.
 
     The same selection logic is applied in both pipelines so the only
     difference between them is the wording of the query, not how chunks
@@ -537,29 +590,50 @@ def select_context_chunks(question: str, retrieved: list[dict], max_chunks: int)
     selected: list[dict] = []
     seen_ids: set[str] = set()
 
-    def _reserve(predicate) -> None:
-        """Find the first retrieved chunk matching predicate and reserve it."""
+    def _reserve(predicate) -> bool:
+        """Find the first retrieved chunk matching predicate and reserve it.
+        Returns True if a chunk was reserved, False otherwise."""
         if len(selected) >= max_chunks:
-            return
+            return False
         for chunk in retrieved:
             if chunk.get("chunk_id") in seen_ids:
                 continue
             if predicate(chunk):
                 selected.append(chunk)
                 seen_ids.add(chunk["chunk_id"])
-                return
+                return True
+        return False
 
     # Pass 1: (company, year) pairs when both kinds of constraint are present.
+    # Try value-aware match first; fall back to plain (company, year) if no
+    # value-bearing candidate exists.
     if mentioned_cos and mentioned_yrs:
         for company in mentioned_cos:
             for year in mentioned_yrs:
-                _reserve(lambda c, co=company, yr=year:
-                         c.get("company") == co and c.get("year") == yr)
+                reserved = _reserve(
+                    lambda c, co=company, yr=year: (
+                        c.get("company") == co
+                        and c.get("year") == yr
+                        and _has_value_pattern(c.get("text", ""), question)
+                    )
+                )
+                if not reserved:
+                    _reserve(
+                        lambda c, co=company, yr=year:
+                            c.get("company") == co and c.get("year") == yr
+                    )
 
     # Pass 1b: year-only reservations when no company is named.
     if mentioned_yrs and not mentioned_cos:
         for year in mentioned_yrs:
-            _reserve(lambda c, yr=year: c.get("year") == yr)
+            reserved = _reserve(
+                lambda c, yr=year: (
+                    c.get("year") == yr
+                    and _has_value_pattern(c.get("text", ""), question)
+                )
+            )
+            if not reserved:
+                _reserve(lambda c, yr=year: c.get("year") == yr)
 
     # Pass 2: ensure each named company has at least one chunk, even if no
     # (company, year) reservation succeeded above.
