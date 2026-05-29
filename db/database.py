@@ -1,7 +1,6 @@
 """
 db/database.py
-"""db/database.py
-
+ 
 All SQLite read/write functions for the benchmark pipeline.
 This is the only file in the codebase that imports sqlite3 directly.
 Schema is defined in db/schema.sql and executed once via init_db().
@@ -161,6 +160,75 @@ def get_incomplete_runs(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM runs WHERE status IN ('pending', 'running')"
     ).fetchall()
+
+
+# ---------------------------------------------------------------------------
+# decompositions  (multi-step pipeline only)
+# ---------------------------------------------------------------------------
+ 
+def create_decomposition(conn: sqlite3.Connection, run_id: int) -> int:
+    """
+    Insert a pending decomposition row for a run.
+    Returns the auto-assigned decomp_id.
+    Called immediately after create_run, before the decomposition LLM call,
+    so the run is resumable even if the decomposition call itself fails.
+    """
+    cursor = conn.execute(
+        """
+        INSERT INTO decompositions (run_id, status)
+        VALUES (?, 'pending')
+        """,
+        (run_id,),
+    )
+    conn.commit()
+    decomp_id: int = cursor.lastrowid
+    logger.debug("Created pending decomposition %d for run %d", decomp_id, run_id)
+    return decomp_id
+ 
+ 
+def complete_decomposition(
+    conn: sqlite3.Connection,
+    decomp_id: int,
+    sub_questions_json: str,
+    raw_response: str,
+    input_tokens: int,
+    output_tokens: int,
+    status: str = "complete",
+) -> None:
+    """
+    Persist the result of a decomposition call.
+ 
+    Pass status='complete' on a successful parse with one or more sub-questions.
+    Pass status='failed' when the model output could not be parsed; in that
+    case sub_questions_json should be '[]' and raw_response holds the full
+    model output for debugging.
+    """
+    conn.execute(
+        """
+        UPDATE decompositions
+        SET sub_questions = ?,
+            raw_response  = ?,
+            input_tokens  = ?,
+            output_tokens = ?,
+            status        = ?
+        WHERE decomp_id = ?
+        """,
+        (sub_questions_json, raw_response, input_tokens, output_tokens, status, decomp_id),
+    )
+    conn.commit()
+    logger.info(
+        "Decomposition %d %s | %d+%d tokens",
+        decomp_id, status, input_tokens, output_tokens,
+    )
+ 
+ 
+def get_decomposition(
+    conn: sqlite3.Connection, run_id: int
+) -> sqlite3.Row | None:
+    """Return the decomposition row for a run, or None if none exists yet."""
+    return conn.execute(
+        "SELECT * FROM decompositions WHERE run_id = ?", (run_id,)
+    ).fetchone()
 
 
 # ---------------------------------------------------------------------------

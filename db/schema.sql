@@ -24,10 +24,23 @@ CREATE TABLE IF NOT EXISTS runs (
     total_cost_usd  REAL
 );
 
+-- One row per multi-step run, recording the decomposition call.
+-- The single_shot pipeline never writes to this table.
+CREATE TABLE IF NOT EXISTS decompositions (
+    decomp_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id        INTEGER NOT NULL UNIQUE REFERENCES runs(run_id),
+    sub_questions TEXT,    -- JSON array of parsed sub-questions (empty array on failure)
+    raw_response  TEXT,    -- unparsed LLM output, kept for debugging parse failures
+    status        TEXT    NOT NULL DEFAULT 'pending',  -- 'pending' | 'complete' | 'failed'
+    input_tokens  INTEGER,
+    output_tokens INTEGER,
+    created_at    TEXT    DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS steps (
     step_id          INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id           INTEGER NOT NULL REFERENCES runs(run_id),
-    step_index       INTEGER NOT NULL,  -- 0-indexed position in the decomposition sequence
+    step_index       INTEGER NOT NULL,  -- 1-indexed position in the sub-question sequence
     sub_question     TEXT,
     retrieved_chunks TEXT,
     answer           TEXT,
