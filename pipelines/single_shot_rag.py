@@ -8,25 +8,22 @@ Retrieves top-N chunks with the BM25 + dense hybrid retriever from
 boost for multi-company questions), builds a citation-ready prompt, and asks
 a Nebius-hosted Qwen model to answer in one pass.
 
-This script logs each run to `logs/rag_runs.jsonl` and reuses the existing
-vector store at `data/vector_store.db`. Behaviour is unchanged from the
-pre-refactor version - the shared retrieval / formatting / cost helpers have
-simply been moved into `retrieval.py` so the multi-step pipeline can call
-them identically.
+This script reuses the existing vector store at `data/vector_store.db` and
+persists everything (question, run, retrieval, final answer) to
+`db/benchmark.db`. The retrieved chunks are written to the `steps` table at
+step_index=1 so chunk-level audit info has the same shape as the multi-step
+pipeline; that's what lets dump_runs.py read both pipelines uniformly.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -39,9 +36,7 @@ from utils import bootstrap_runtime_env, ensure_stage_dirs
 from retrieval import (
     BM25_WEIGHT,
     RRF_K,
-    calculate_generation_cost,
     check_budget,
-    extract_citations,
     format_context,
     hybrid_retrieve,
     load_index,
@@ -49,6 +44,7 @@ from retrieval import (
     make_client,
     remove_stopwords,
     select_context_chunks,
+    summarise_chunks_for_step,
 )
 
 bootstrap_runtime_env()
@@ -65,12 +61,11 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-DEFAULT_TOP_N = 20
+DEFAULT_TOP_N = 40
 DEFAULT_CONTEXT_CHUNKS = 10
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 DEFAULT_MODEL = os.environ.get("RAG_GENERATION_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507")
-RAG_RUNS_LOG = LOG_DIR / "rag_runs.jsonl"
 
 SINGLE_SHOT_SYSTEM_PROMPT = (
     "You are an expert analyst specialising in corporate carbon performance and emissions reporting. "
@@ -133,13 +128,6 @@ def _run_generation(
         "total_tokens": int(getattr(usage, "total_tokens", 0) or 0),
     }
     return answer, token_usage
-
-
-def _append_run_log(record: dict[str, Any]) -> None:
-    """Append one JSONL record to the shared single-shot run log."""
-    RAG_RUNS_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with RAG_RUNS_LOG.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -221,30 +209,7 @@ def main() -> None:
         max_output_tokens=args.max_output_tokens,
     )
     latency_seconds = time.perf_counter() - start_time
-    citations = extract_citations(answer)
-    run_uuid = str(uuid.uuid4())
-
     log.info("Answer:\n%s", answer)
-
-    # JSONL audit record (human-friendly)
-    record = {
-        "run_id": run_uuid,
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "question": args.question,
-        "model": args.model,
-        "db_path": str(args.db),
-        "top_n": args.top_n,
-        "context_chunks": args.context_chunks,
-        "selected_chunk_ids": [chunk["chunk_id"] for chunk in context_chunks],
-        "selected_document_ids": [chunk.get("document_id") for chunk in context_chunks],
-        "selected_pages": [chunk.get("page_number") for chunk in context_chunks],
-        "citations": citations,
-        "answer": answer,
-        "token_usage": token_usage,
-        "latency_seconds": round(latency_seconds, 3),
-    }
-    _append_run_log(record)
-    log.info("Saved run to %s", RAG_RUNS_LOG)
 
     # Persist to SQLite using db/database.py
     conn = database.get_connection()
@@ -264,6 +229,22 @@ def main() -> None:
             extra={"phase": "single_shot", "run_id": run_id},
         )
         total_tokens = prompt_tokens + completion_tokens
+
+        # Persist retrieval as step_index=1 so the steps table holds chunk-level
+        # audit info for single_shot in the same shape as multi_step. Lets
+        # dump_runs.py read chunk info uniformly across pipelines. Uses the
+        # same `summarise_chunks_for_step` helper the multi-step pipeline uses,
+        # so the JSON shape (chunk_id, page_number, document_label) is
+        # identical between the two.
+        step_id = database.insert_step(conn, run_id, 1, args.question)
+        database.complete_step(
+            conn,
+            step_id,
+            answer=answer,
+            retrieved_chunks=summarise_chunks_for_step(context_chunks),
+            input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
+        )
 
         database.insert_final_answer(conn, run_id, answer)
         database.complete_run(conn, run_id, latency_seconds, int(total_tokens), run_cost)
