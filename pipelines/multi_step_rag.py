@@ -30,7 +30,7 @@ import os
 import re
 import sys
 import time
-import uuid
+import hashlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -232,6 +232,11 @@ Established findings:
 {findings}
 """
 
+# Stable question id helper 
+def stable_qid(question_text: str) -> str:
+    """Deterministic question id derived from normalized text."""
+    norm = " ".join(question_text.split()).lower()
+    return hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
 
 # ---------------------------------------------------------------------------
 # LLM call wrapper
@@ -843,7 +848,7 @@ def main() -> None:
             run_id, question_id, question_text, decomp_id, sub_qs = prepare_resume(conn, args.resume)
             log.info("[run %d] Resuming multi-step pipeline.", run_id)
         else:
-            question_id = str(uuid.uuid4())
+            question_id = stable_qid(args.question)
             database.insert_question(conn, question_id, args.question)
             run_id = database.create_run(conn, question_id, PIPELINE_TYPE, args.model)
             decomp_id = database.create_decomposition(conn, run_id)

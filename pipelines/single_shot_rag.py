@@ -22,7 +22,7 @@ import logging
 import os
 import sys
 import time
-import uuid
+import hashlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -88,6 +88,11 @@ Retrieved passages:
 
 Question: {question}"""
 
+# Stable question id helper 
+def stable_qid(question_text: str) -> str:
+    """Deterministic question id derived from normalized text."""
+    norm = " ".join(question_text.split()).lower()
+    return hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
 
 # ---------------------------------------------------------------------------
 # Single-shot specific helpers
@@ -215,7 +220,7 @@ def main() -> None:
     conn = database.get_connection()
     try:
         database.init_db(conn)
-        question_id = str(uuid.uuid4())
+        question_id = stable_qid(args.question)
         database.insert_question(conn, question_id, args.question)
         run_id = database.create_run(conn, question_id, "single_shot", args.model)
 
