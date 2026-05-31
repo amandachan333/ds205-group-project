@@ -71,13 +71,94 @@ We route table pages through Gemini Vision (`gemini-2.5-flash`), which returns s
 
 ## Retrieval strategy
 
-### BM25 hybrid vs pure semantic
+Retrieval performance was the single most tuned pipeline parameter,
+because both pipelines depend on surfacing the right chunks before
+generation can produce correct answers. The configuration described
+below is the final locked state used for all benchmark runs.
+File-level implementation details and known limitations are in.
 
-We implement BM25 hybrid as our primary retrieval method: semantic similarity scores from the embedding model combined with BM25 keyword scores, weighted and merged into a single ranked list.
+### Hybrid retrieval over dense-only
 
-### Chunking strategy
+We combine BM25 keyword matching with dense embedding similarity via
+Reciprocal Rank Fusion. Dense-only retrieval was rejected because the
+embedding model handles rare-token matching poorly — specific numeric
+values, year references, and unit strings ("tCO2e/MWh") carry weak
+semantic signal in a sentence-encoder vector. Pure BM25 was rejected
+because paraphrased queries from sub-question decomposition lose lexical
+overlap with chunk text. RRF was chosen over weighted score
+normalisation because BM25 and dense score distributions are not
+directly comparable and rank-based fusion sidesteps the normalisation
+question entirely.
 
-We use fixed-size (char-limit) chunking as our baseline. 
+The BM25 relative weight was empirically determined by sweeping
+{0, 1, 2, 3} against the six ground-truth questions: weight=2 was
+optimal at Recall@40 = 0.283. This empirically replicates a finding
+from problem set 2 on a different corpus. The RRF constant k=60 was
+adopted from Cormack et al. (2009) without corpus-specific sweeping;
+RRF is known to be relatively insensitive across the typical range.
+
+### Sentence-window chunking over fixed-character splitting
+
+Fixed-character splitting can cut mid-sentence, breaking the
+subject-verb-value link that emission statements depend on
+("Scope 1 intensity was | 0.57 tCO2e/MWh in FY2022"). Sentence-window
+chunking builds chunks sentence-by-sentence with a configurable
+overlap of complete sentences, so no fact is split across a boundary.
+Table chunks (identified by pipe characters from Gemini's markdown
+output) are kept intact regardless of length rather than being split.
+
+The known limitation is that the chunker cannot preserve column
+alignment within multi-row tables when Gemini's extraction itself
+flattens rows. This manifested as the DEWA Combined-vs-Electricity
+column confusion in run 31. A table-aware chunker that re-parsed
+markdown rows would address this but was out of scope.
+
+### Two-stage selection: candidate pool then context window
+
+Retrieval returns top_n = 40 chunks via RRF, of which 10 reach the
+generation prompt via `select_context_chunks`. The two-stage design
+separates "plausibly relevant" from "covers the question's distinct
+facets." Diagnostic runs through `evaluate_retrieval.py` showed
+value-bearing chunks ranking in positions 7-35 even when correctly
+indexed; a smaller candidate pool sometimes excluded the right chunk
+before selection ran. context_chunks = 10 is constrained by prompt
+budget at the 30B model's effective attention window.
+
+### Three-pass value-aware context selection
+
+`select_context_chunks` applies three reservation passes in order:
+value-aware year reservation (prefers chunks containing a value
+pattern relevant to the question's intent over chunks that merely
+match company-and-year), company reservation for multi-company
+questions, and rank fill for remaining slots. The value-aware pass
+was added after observing that the prior year-only boost reserved the
+first (company, year) chunk in rank order, which was frequently a
+discussion of future targets ("5% annual reduction from 2024 onwards")
+rather than a chunk containing the actual reported value
+("0.5571 tCO2e/MWh").
+
+The three-pass composition was case-validated against ground-truth
+chunk recall on the six questions rather than aggregate-ablation
+tested. A clean ablation against `evaluate_retrieval.py` would produce
+a stronger empirical claim and is recommended as future work.
+
+### Corpus inventory injection
+
+The decomposition prompt receives a corpus-inventory string listing
+which report years are available per company. This lets the model
+resolve relative time references in the question ("the most recent
+year", "the latest available") to concrete years before writing
+sub-questions. Without this, the model produced sub-questions the
+retrieval layer could not match against concrete year-tagged chunks.
+
+### Boilerplate filter implemented but disabled
+
+A filter that drops short, digit-poor chunks with content signatures
+shared across many other chunks (running headers, cover pages) was
+implemented and tested. After fixing the BM25 tokenization issue, the
+filter showed no measurable effect on retrieval of the chunks we
+tracked. Kept in the codebase for corpora where running-header
+pollution is more severe; default `ENABLE_BOILERPLATE_FILTER = False`.
 
 ## Intermediate storage
 
