@@ -190,6 +190,18 @@ Rules:
 - Use the retrieved passages as your primary source. Use previously established facts only to provide context or to perform reasoning that combines prior findings with new evidence.
 - If the retrieved passages do not contain enough information to answer the sub-question, say so explicitly. Do not guess.
 - If a retrieved passage contains a chart or table with multiple values across years (e.g. a sequence like "0.4178 0.4041 0.4293" labelled "2019-2021"), state explicitly which value you are extracting and which year it corresponds to. The order of values in the source must match the order of years stated in the chart heading, axis label, or surrounding text. If the alignment between values and years is ambiguous, say so rather than guess.
+- If a retrieved passage contains multiple distinct values for the same year (for
+  example, a chart showing both "electricity-only" and "combined electricity and
+  water" emissions intensity, both for 2019), state all candidate values found and
+  explicitly identify which one is the carbon-performance comparable answer for the
+  sub-question. If you cannot determine which is comparable from the passage alone,
+  state that the answer is ambiguous and report both candidates with their labels.
+- If a retrieved passage contains a figure labelled with a different year than the
+  chunk's source report (for example, a chunk from a "2019 Sustainability Report"
+  whose text reads "FY2018 was 0.57 tCO2e/MWh"), report which year the figure
+  actually applies to according to the passage's own text, not the year of the
+  report it appears in. If the year alignment between the passage and the
+  sub-question is unclear, say so explicitly rather than answer.
 - For every factual claim drawn from the retrieved passages, cite the source document and page number in parentheses, e.g. (2023 Sustainability Report, p.12).
 - If the sub-question requires a calculation, show your working.
 - Be concise. One to three sentences is usually sufficient.
@@ -222,6 +234,7 @@ Rules:
 - Address every part of the original question directly.
 - Where findings include citations, carry them through to the final answer so claims remain traceable.
 - If any sub-step finding was incomplete or uncertain, reflect that uncertainty honestly in the final answer rather than smoothing over it.
+- If a sub-step reported multiple candidates with labels, use the most carbon-performance-relevant one (typically electricity-only for utilities) and note the alternative.
 - Write in clear, professional prose suitable for a sustainability analyst. Avoid bullet points unless the question explicitly asks for a list.
 
 ---
