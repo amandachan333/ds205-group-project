@@ -10,6 +10,7 @@ At least one run_id is required.
 
 Reads from the path defined in config.DB_PATH. Read-only — no writes.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -17,9 +18,10 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# Project root on sys.path so we can import config 
+# Project root on sys.path so we can import config
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 DB_PATH = Path("db/benchmark.db")
+
 
 def fetch(run_ids: list[int]) -> list[sqlite3.Row]:
     placeholders = ",".join("?" for _ in run_ids)
@@ -54,17 +56,21 @@ def render(rows: list[sqlite3.Row]) -> str:
         if r["run_id"] != current_run:
             current_run = r["run_id"]
             out.append("")
-            out.append(f"## run {r['run_id']} — {r['question_id']} · {r['pipeline_type']} · {r['model_name']}")
+            out.append(
+                f"## run {r['run_id']} — {r['question_id']} · {r['pipeline_type']} · {r['model_name']}"
+            )
             out.append("")
         out.append(f"### step {r['step_index']}")
         out.append("")
         out.append(f"**sub-question:** {r['sub_question']}")
         out.append("")
-        out.append(f"**intermediate answer:**")
+        out.append("**intermediate answer:**")
         out.append("")
         out.append(r["intermediate_answer"] or "_(empty)_")
         out.append("")
-        out.append(f"<details><summary>retrieved chunks (json)</summary>\n\n```json\n{r['retrieved_chunks']}\n```\n\n</details>")
+        out.append(
+            f"<details><summary>retrieved chunks (json)</summary>\n\n```json\n{r['retrieved_chunks']}\n```\n\n</details>"
+        )
         out.append("")
     return "\n".join(out)
 

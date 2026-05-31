@@ -53,22 +53,23 @@ def parse_answers_table(path: Path) -> list[dict]:
         # columns: run_id | Q | pipeline | model | correctness | faithfulness | notes
         if len(cells) < 7:
             raise SystemExit(f"Malformed row (need 7 cells): {line}")
-        rows.append({
-            "run_id": int(cells[0]),
-            "q": cells[1],
-            "pipeline": cells[2],
-            "model": cells[3],
-            "correctness": cells[4],
-            "faithfulness": cells[5],
-            "notes": cells[6],
-        })
+        rows.append(
+            {
+                "run_id": int(cells[0]),
+                "q": cells[1],
+                "pipeline": cells[2],
+                "model": cells[3],
+                "correctness": cells[4],
+                "faithfulness": cells[5],
+                "notes": cells[6],
+            }
+        )
     return rows
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true",
-                    help="parse and validate only; write nothing")
+    ap.add_argument("--dry-run", action="store_true", help="parse and validate only; write nothing")
     args = ap.parse_args()
 
     rows = parse_answers_table(WORKSHEET)
@@ -79,9 +80,9 @@ def main():
     # Validate: every run_id must exist exactly once in runs
     problems = []
     for r in rows:
-        hit = conn.execute(
-            "SELECT COUNT(*) FROM runs WHERE run_id = ?", (r["run_id"],)
-        ).fetchone()[0]
+        hit = conn.execute("SELECT COUNT(*) FROM runs WHERE run_id = ?", (r["run_id"],)).fetchone()[
+            0
+        ]
         if hit != 1:
             problems.append((r["run_id"], hit))
     if problems:
@@ -94,14 +95,15 @@ def main():
     for r in rows:
         for field in ("correctness", "faithfulness"):
             if not frac.match(r[field]):
-                print(f"  WARNING run {r['run_id']}: {field}='{r[field]}' "
-                      f"is not a k/n fraction")
+                print(f"  WARNING run {r['run_id']}: {field}='{r[field]}' is not a k/n fraction")
 
     if args.dry_run:
         print("\n--dry-run: validation passed, no rows written.")
         for r in rows:
-            print(f"  {r['run_id']:>3} {r['q']} {r['pipeline']:<11} {r['model']:<4} "
-                  f"corr={r['correctness']:<4} faith={r['faithfulness']}")
+            print(
+                f"  {r['run_id']:>3} {r['q']} {r['pipeline']:<11} {r['model']:<4} "
+                f"corr={r['correctness']:<4} faith={r['faithfulness']}"
+            )
         return
 
     scored_ids = [r["run_id"] for r in rows]

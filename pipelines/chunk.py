@@ -16,10 +16,10 @@ Usage:
 
 from __future__ import annotations
 
-import sys
 import argparse
 import logging
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +37,7 @@ from config import (
     MIN_CHUNK_LENGTH,
     SENTENCE_OVERLAP,
 )
-from utils import derive_year, ensure_stage_dirs, save_jsonl_atomic, load_jsonl
+from utils import derive_year, ensure_stage_dirs, load_jsonl, save_jsonl_atomic
 
 # ---------------------------------------------------------------------------
 # Logging – writes to logs/chunk.log AND stderr
@@ -58,9 +58,7 @@ logger = logging.getLogger(__name__)
 # unstructured element types emitted as standalone chunks (never sentence-split).
 # "Table" is included because Gemini extracts tables as single pipe-delimited
 # text blocks; splitting mid-table destroys row/column context.
-_HEADING_TYPES: frozenset[str] = frozenset(
-    {"Title", "Header", "Heading", "SubHeading", "Table"}
-)
+_HEADING_TYPES: frozenset[str] = frozenset({"Title", "Header", "Heading", "SubHeading", "Table"})
 
 # Boilerplate patterns that appear verbatim across many company reports
 # (e.g. legal cautionary statements).  Chunks matching any of these are
@@ -76,6 +74,7 @@ BOILERPLATE_PAGE_WINDOW: int = 5  # only match within last N pages of the doc
 # Utilities
 # ---------------------------------------------------------------------------
 
+
 def _ensure_nltk_punkt() -> None:
     """Download the punkt tokeniser data if it is not already present."""
     try:
@@ -89,6 +88,7 @@ def _ensure_nltk_punkt() -> None:
 # ---------------------------------------------------------------------------
 # Element conversion
 # ---------------------------------------------------------------------------
+
 
 def _convert_element(
     record: dict[str, Any],
@@ -131,30 +131,29 @@ def _convert_element(
 # Cleaner helpers  (adapted from TPI cleaner.py)
 # ---------------------------------------------------------------------------
 
-def _merge_short_chunks(
-    chunks: list[dict], min_length: int = MIN_CHUNK_LENGTH
-) -> list[dict]:
+
+def _merge_short_chunks(chunks: list[dict], min_length: int = MIN_CHUNK_LENGTH) -> list[dict]:
     """
     Merge a chunk into the one before it when the preceding chunk is
     shorter than *min_length* characters.
- 
+
     Table chunks are never merged regardless of length — a two-row table
     is still a self-contained unit and should not be glued to the
     following paragraph.  Mirrors TPI merge_short_chunks.
     """
     if not chunks:
         return chunks
- 
+
     merged: list[dict] = []
     current: dict | None = None
- 
+
     for chunk in chunks:
         if current is None:
             current = chunk
             continue
- 
+
         current_is_table = "Table" in current.get("metadata", {}).get("element_types", [])
- 
+
         if len(current["text"]) < min_length and not current_is_table:
             current["text"] = current["text"] + " " + chunk["text"]
             meta_c = current.get("metadata", {})
@@ -167,26 +166,26 @@ def _merge_short_chunks(
         else:
             merged.append(current)
             current = chunk
- 
+
     if current is not None:
         merged.append(current)
     return merged
- 
- 
+
+
 def _extract_table_header(rows: list[str]) -> str:
     """
     Extract header context from a list of table rows, for use when a
     large table must be split across multiple chunks.
- 
+
     In Gemini's pipe-delimited output format:
     - Rows with no '|' are section labels / captions (full-width markers).
     - The first row with '|' encodes the column structure as 'Col: value'.
- 
+
     Returns a string to prepend to sub-chunks 2, 3, ... so each one
     carries enough context to be independently interpretable.
     """
     header_lines: list[str] = []
- 
+
     # Collect leading label/caption rows (no pipe = not a data row)
     first_data_idx = 0
     for i, row in enumerate(rows):
@@ -195,20 +194,18 @@ def _extract_table_header(rows: list[str]) -> str:
             first_data_idx = i + 1
         else:
             break
- 
+
     # Include the first data row — its keys name the columns
     if first_data_idx < len(rows):
         header_lines.append(rows[first_data_idx])
- 
+
     return "\n".join(header_lines)
- 
- 
-def _split_long_chunks(
-    chunks: list[dict], max_length: int = MAX_CHUNK_LENGTH
-) -> list[dict]:
+
+
+def _split_long_chunks(chunks: list[dict], max_length: int = MAX_CHUNK_LENGTH) -> list[dict]:
     """
     Hard-split any chunk longer than *max_length* chars.
- 
+
     - Regular text: split on sentence boundaries (original behaviour).
     - Table chunks: split on row boundaries (newlines) and prepend the
       table header to every continuation sub-chunk so each one is
@@ -216,15 +213,15 @@ def _split_long_chunks(
     """
     result: list[dict] = []
     counter = 0
- 
+
     for chunk in chunks:
         text = chunk.get("text", "")
         if len(text) <= max_length:
             result.append(chunk)
             continue
- 
+
         is_table = "Table" in chunk.get("metadata", {}).get("element_types", [])
- 
+
         if is_table:
             rows = [r for r in text.split("\n") if r.strip()]
             # unstructured sometimes misclassifies dense narrative blocks as
@@ -233,88 +230,85 @@ def _split_long_chunks(
             has_pipe_format = any("|" in r for r in rows)
             if not has_pipe_format:
                 is_table = False
- 
+
         if is_table:
             rows = [r for r in text.split("\n") if r.strip()]
             header_text = _extract_table_header(rows)
- 
+
             cur_rows: list[str] = []
             cur_len: int = 0
             is_continuation: bool = False  # True for sub-chunks 2, 3, …
- 
+
             for row in rows:
                 row_len = len(row) + 1  # +1 for the joining newline
                 if cur_rows and cur_len + row_len > max_length:
-                    result.append({
+                    result.append(
+                        {
+                            "id": f"_split_{counter}",
+                            "text": "\n".join(cur_rows),
+                            "metadata": {
+                                **chunk.get("metadata", {}).copy(),
+                                "table_continuation": is_continuation,
+                            },
+                        }
+                    )
+                    counter += 1
+                    # Prepend header rows to continuation sub-chunks
+                    is_continuation = True
+                    cur_rows = [*header_text.split("\n"), row] if header_text else [row]
+                    cur_len = len(header_text) + 1 + row_len if header_text else row_len
+                else:
+                    cur_rows.append(row)
+                    cur_len += row_len
+
+            if cur_rows:
+                result.append(
+                    {
                         "id": f"_split_{counter}",
                         "text": "\n".join(cur_rows),
                         "metadata": {
                             **chunk.get("metadata", {}).copy(),
                             "table_continuation": is_continuation,
                         },
-                    })
-                    counter += 1
-                    # Prepend header rows to continuation sub-chunks
-                    is_continuation = True
-                    cur_rows = (
-                        [*header_text.split("\n"), row]
-                        if header_text else [row]
-                    )
-                    cur_len = (
-                        len(header_text) + 1 + row_len
-                        if header_text else row_len
-                    )
-                else:
-                    cur_rows.append(row)
-                    cur_len += row_len
- 
-            if cur_rows:
-                result.append({
-                    "id": f"_split_{counter}",
-                    "text": "\n".join(cur_rows),
-                    "metadata": {
-                        **chunk.get("metadata", {}).copy(),
-                        "table_continuation": is_continuation,
-                    },
-                })
+                    }
+                )
                 counter += 1
- 
+
         else:
             # Original sentence-boundary split for non-table chunks
             sentences: list[str] = chunk.get("sentences") or sent_tokenize(text)
             cur_text = ""
             cur_sentences: list[str] = []
- 
+
             for sentence in sentences:
-                would_exceed = (
-                    cur_text
-                    and len(cur_text) + 1 + len(sentence) > max_length
-                )
+                would_exceed = cur_text and len(cur_text) + 1 + len(sentence) > max_length
                 if would_exceed:
-                    result.append({
-                        "id": f"_split_{counter}",
-                        "text": cur_text.strip(),
-                        "sentences": cur_sentences,
-                        "metadata": chunk.get("metadata", {}).copy(),
-                    })
+                    result.append(
+                        {
+                            "id": f"_split_{counter}",
+                            "text": cur_text.strip(),
+                            "sentences": cur_sentences,
+                            "metadata": chunk.get("metadata", {}).copy(),
+                        }
+                    )
                     counter += 1
                     cur_text = sentence
                     cur_sentences = [sentence]
                 else:
-                    cur_text = (
-                        (cur_text + " " + sentence).strip() if cur_text else sentence
-                    )
+                    cur_text = (cur_text + " " + sentence).strip() if cur_text else sentence
                     cur_sentences.append(sentence)
- 
+
             if cur_text:
-                result.append({
-                    "id": f"_split_{counter}",
-                    "text": cur_text.strip(),
-                    "sentences": cur_sentences,
-                    "metadata": chunk.get("metadata", {}).copy(),
-                })
+                result.append(
+                    {
+                        "id": f"_split_{counter}",
+                        "text": cur_text.strip(),
+                        "sentences": cur_sentences,
+                        "metadata": chunk.get("metadata", {}).copy(),
+                    }
+                )
                 counter += 1
- 
+
     return result
 
 
@@ -330,7 +324,7 @@ def _is_severely_corrupted(text: str) -> bool:
     word_count = max(len(text.split()), 1)
     if cid_count / word_count > 0.3:
         return True
-    if text.count("\ufffd") > 5:   # Unicode replacement chars
+    if text.count("\ufffd") > 5:  # Unicode replacement chars
         return True
     return False
 
@@ -338,11 +332,11 @@ def _is_severely_corrupted(text: str) -> bool:
 def _fix_co2e(text: str) -> str:
     """
     Normalise tCO,e / tco,e -> tCO2e.
- 
+
     unstructured renders the subscript '2' in CO2e as a comma when it
     fails to parse the glyph, producing artefacts like:
         '14.7 MtCO,e'  '0.5 tco,e'  '3.2 ktCO,e'
- 
+
     Matches optional SI prefix (k/M/G) + t/T, then CO/co, comma, e/eq.
     """
     return re.sub(
@@ -365,7 +359,7 @@ def _remove_gibberish(chunks: list[dict]) -> list[dict]:
     Drop severely corrupted chunks; lightly clean the rest.
     Mirrors TPI remove_gibberish but without heavy Latin-script heuristics
     that are unnecessary for our corpus quality.
- 
+
     Cleaning steps applied to each surviving chunk:
       1. Strip CID encoding artefacts  e.g. (cid:42)
       2. Remove non-printable control characters
@@ -386,11 +380,12 @@ def _remove_gibberish(chunks: list[dict]) -> list[dict]:
             chunk["text"] = text.strip()
             clean.append(chunk)
     return clean
- 
+
 
 # ---------------------------------------------------------------------------
 # Core sentence-based chunker  (adapted from TPI DocChunker.chunk_document_by_sentences)
 # ---------------------------------------------------------------------------
+
 
 def _chunk_by_sentences(
     elements: list[dict[str, Any]],
@@ -426,31 +421,35 @@ def _chunk_by_sentences(
         # ── Headings: flush current chunk, then emit standalone heading chunk ──
         if el_type in _HEADING_TYPES:
             if cur_sentences:
-                chunks.append({
-                    "id": f"chunk_{chunk_idx}",
-                    "text": cur_text.strip(),
-                    "sentences": cur_sentences,
-                    "metadata": cur_meta,
-                })
+                chunks.append(
+                    {
+                        "id": f"chunk_{chunk_idx}",
+                        "text": cur_text.strip(),
+                        "sentences": cur_sentences,
+                        "metadata": cur_meta,
+                    }
+                )
                 chunk_idx += 1
                 cur_text = ""
                 cur_sentences = []
                 cur_meta = {}
                 cur_element_types = set()
 
-            chunks.append({
-                "id": f"chunk_{chunk_idx}",
-                "text": el_text.strip(),
-                "sentences": [el_text.strip()],
-                "metadata": {
-                    "element_types": [el_type],
-                    "page_number": el_meta.get("page_number", 0),
-                    "paragraph_numbers": [el_meta.get("paragraph_number")],
-                    "filename": el_meta.get("filename", ""),
-                    "company": el_meta.get("company", ""),
-                    "document_title": el_meta.get("document_title", ""),
-                },
-            })
+            chunks.append(
+                {
+                    "id": f"chunk_{chunk_idx}",
+                    "text": el_text.strip(),
+                    "sentences": [el_text.strip()],
+                    "metadata": {
+                        "element_types": [el_type],
+                        "page_number": el_meta.get("page_number", 0),
+                        "paragraph_numbers": [el_meta.get("paragraph_number")],
+                        "filename": el_meta.get("filename", ""),
+                        "company": el_meta.get("company", ""),
+                        "document_title": el_meta.get("document_title", ""),
+                    },
+                }
+            )
             chunk_idx += 1
             continue
 
@@ -480,22 +479,19 @@ def _chunk_by_sentences(
             if not sentence:
                 continue
 
-            cur_text = (
-                (cur_text + " " + sentence).strip() if cur_text else sentence
-            )
+            cur_text = (cur_text + " " + sentence).strip() if cur_text else sentence
             cur_sentences.append(sentence)
 
             # Emit chunk when size limit is reached
-            if (
-                len(cur_text) >= max_chunk_size
-                and len(cur_sentences) > overlap + 1
-            ):
-                chunks.append({
-                    "id": f"chunk_{chunk_idx}",
-                    "text": cur_text.strip(),
-                    "sentences": list(cur_sentences),
-                    "metadata": cur_meta,
-                })
+            if len(cur_text) >= max_chunk_size and len(cur_sentences) > overlap + 1:
+                chunks.append(
+                    {
+                        "id": f"chunk_{chunk_idx}",
+                        "text": cur_text.strip(),
+                        "sentences": list(cur_sentences),
+                        "metadata": cur_meta,
+                    }
+                )
                 chunk_idx += 1
 
                 # Carry overlap sentences into the new chunk
@@ -503,9 +499,7 @@ def _chunk_by_sentences(
                 cur_text = " ".join(cur_sentences)
                 cur_meta = {
                     "element_types": [el_type],
-                    "page_number": el_meta.get(
-                        "page_number", cur_meta.get("page_number", 0)
-                    ),
+                    "page_number": el_meta.get("page_number", cur_meta.get("page_number", 0)),
                     "paragraph_numbers": [el_meta.get("paragraph_number")],
                     "filename": cur_meta.get("filename", ""),
                     "company": cur_meta.get("company", ""),
@@ -515,12 +509,14 @@ def _chunk_by_sentences(
 
     # Flush any remaining sentences
     if cur_sentences:
-        chunks.append({
-            "id": f"chunk_{chunk_idx}",
-            "text": cur_text.strip(),
-            "sentences": cur_sentences,
-            "metadata": cur_meta,
-        })
+        chunks.append(
+            {
+                "id": f"chunk_{chunk_idx}",
+                "text": cur_text.strip(),
+                "sentences": cur_sentences,
+                "metadata": cur_meta,
+            }
+        )
 
     return chunks
 
@@ -543,7 +539,7 @@ def _clean_chunks(
 def _find_boilerplate_page(chunks: list[dict]) -> int | None:
     """
     Return the first page number where boilerplate content begins, or None.
- 
+
     Only considers chunks within the last BOILERPLATE_PAGE_WINDOW pages of
     the document.  This prevents false matches on legitimate mentions of
     "forward-looking statements" in the body of the report — those phrases
@@ -560,7 +556,7 @@ def _find_boilerplate_page(chunks: list[dict]) -> int | None:
             return page
     return None
 
- 
+
 def process_file(
     jsonl_path: Path,
     output_dir: Path,
@@ -568,32 +564,33 @@ def process_file(
 ) -> Path | None:
     """
     Chunk one extracted JSONL file and write the result to *output_dir*.
- 
+
     Returns the output path on success, None if the file was skipped.
     """
     company: str = jsonl_path.parent.name
     # Remove the "_elements" suffix that extract.py appends
     doc_id: str = re.sub(r"_elements$", "", jsonl_path.stem)
     year: int | None = derive_year(doc_id)
- 
+
     out_path: Path = output_dir / company / f"{doc_id}_chunks.jsonl"
- 
+
     if out_path.exists() and not force:
         logger.info(
             "SKIP  %s/%s  (output exists; use --force to reprocess)",
-            company, jsonl_path.name,
+            company,
+            jsonl_path.name,
         )
         return None
- 
+
     logger.info("Processing  %s / %s", company, jsonl_path.name)
- 
+
     # Read extracted elements
     raw_records: list[dict] = load_jsonl(jsonl_path)
- 
+
     if not raw_records:
         logger.warning("No records found in %s — skipping", jsonl_path)
         return None
- 
+
     # Convert to internal element format
     page_para_counter: dict[int, int] = {}
     elements: list[dict] = [
@@ -601,21 +598,21 @@ def process_file(
         for r in raw_records
         if r.get("text", "").strip()
     ]
- 
+
     logger.info("  Input elements: %d", len(elements))
- 
+
     # Chunk
     raw_chunks = _chunk_by_sentences(elements)
     logger.info("  Raw chunks:     %d", len(raw_chunks))
- 
+
     # Clean
     clean_chunks = _clean_chunks(raw_chunks)
     logger.info("  Clean chunks:   %d", len(clean_chunks))
- 
+
     if not clean_chunks:
         logger.warning("No chunks produced for %s — skipping output", jsonl_path.name)
         return None
- 
+
     # Build output records with stable, globally unique chunk IDs
     output_records: list[dict] = [
         {
@@ -630,7 +627,7 @@ def process_file(
         }
         for idx, chunk in enumerate(clean_chunks)
     ]
- 
+
     # Drop all chunks from the first boilerplate page onwards.
     # The trigger page is only detected within the last BOILERPLATE_PAGE_WINDOW
     # pages, so earlier legitimate mentions are not affected.
@@ -638,28 +635,27 @@ def process_file(
     if boilerplate_page is not None:
         before = len(output_records)
         output_records = [
-            r for r in output_records
-            if (r.get("page_number") or 0) < boilerplate_page
+            r for r in output_records if (r.get("page_number") or 0) < boilerplate_page
         ]
         logger.info(
             "  Dropped %d boilerplate chunk(s) from page %d onwards",
-            before - len(output_records), boilerplate_page,
+            before - len(output_records),
+            boilerplate_page,
         )
- 
+
     if not output_records:
         logger.warning("All chunks dropped as boilerplate for %s", jsonl_path.name)
         return None
- 
+
     save_jsonl_atomic(output_records, out_path)
-    logger.info(
-        "  Written → %s  (%d chunks)", out_path, len(output_records)
-    )
+    logger.info("  Written → %s  (%d chunks)", out_path, len(output_records))
     return out_path
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -685,7 +681,8 @@ def main() -> None:
         help="Process only this company subfolder (default: all companies).",
     )
     parser.add_argument(
-        "--force", "-f",
+        "--force",
+        "-f",
         action="store_true",
         help="Re-chunk files even if output already exists.",
     )
@@ -720,7 +717,8 @@ def main() -> None:
 
     logger.info(
         "Chunking complete — %d file(s) processed, %d total chunks",
-        total_files, total_chunks,
+        total_files,
+        total_chunks,
     )
 
 

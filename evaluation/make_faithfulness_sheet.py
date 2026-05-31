@@ -16,7 +16,6 @@ Usage (from repo root):
 import argparse
 import glob
 import json
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -76,12 +75,14 @@ def build_sheet(run: dict, chunk_text: dict) -> str:
     model = short_model(run.get("model", ""))
     L = []
     L.append(f"# Faithfulness sheet — run {rid} · {pipe} · {model}\n")
-    L.append(f"**Question:** {fix_mojibake(run.get('question',''))}\n")
+    L.append(f"**Question:** {fix_mojibake(run.get('question', ''))}\n")
     L.append("## Model answer\n")
     L.append(fix_mojibake(run.get("answer", "")) + "\n")
     L.append("## Retrieved chunk text\n")
-    L.append("Trace each claim in the answer above to the text below. "
-             "A claim is *faithful* only if a chunk here actually contains it.\n")
+    L.append(
+        "Trace each claim in the answer above to the text below. "
+        "A claim is *faithful* only if a chunk here actually contains it.\n"
+    )
 
     step_chunks = run.get("step_chunks")
     if pipe == "multi_step" and step_chunks:
@@ -123,8 +124,13 @@ def build_sheet(run: dict, chunk_text: dict) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", nargs="*", type=int, default=None,
-                    help="specific run_id(s); default = all runs in runs.jsonl")
+    ap.add_argument(
+        "--runs",
+        nargs="*",
+        type=int,
+        default=None,
+        help="specific run_id(s); default = all runs in runs.jsonl",
+    )
     args = ap.parse_args()
 
     runs = load_runs()

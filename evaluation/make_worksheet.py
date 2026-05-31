@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent          # repo root (one level above evaluation/)
+ROOT = Path(__file__).resolve().parent.parent  # repo root (one level above evaluation/)
 RUNS = ROOT / "logs" / "runs.jsonl"
 GT = ROOT / "evaluation" / "ground_truth.md"
 OUT = ROOT / "evaluation" / "scoring_worksheet.md"
@@ -42,8 +42,12 @@ def parse_ground_truth(text: str) -> dict:
     for i in range(1, len(blocks), 2):
         qnum = int(blocks[i])
         body = blocks[i + 1]
-        m_q = re.search(r"\*\*Question\*\*:\s*(.+?)(?=\n\s*\*\*Expected answer\*\*)", body, re.DOTALL)
-        m_a = re.search(r"\*\*Expected answer\*\*:\s*(.+?)(?=\n\s*\*\*Sources\*\*)", body, re.DOTALL)
+        m_q = re.search(
+            r"\*\*Question\*\*:\s*(.+?)(?=\n\s*\*\*Expected answer\*\*)", body, re.DOTALL
+        )
+        m_a = re.search(
+            r"\*\*Expected answer\*\*:\s*(.+?)(?=\n\s*\*\*Sources\*\*)", body, re.DOTALL
+        )
         out[qnum] = {
             "question": (m_q.group(1).strip() if m_q else "(could not parse question)"),
             "expected": (m_a.group(1).strip() if m_a else "(could not parse expected answer)"),
@@ -92,16 +96,22 @@ def build(runs: list, gt: dict) -> str:
     for r in runs:
         r["_qnum"] = gt_by_norm.get(norm(r.get("question", "")), None)
 
-    runs.sort(key=lambda r: (r["_qnum"] or 99,
-                             r.get("pipeline_type", ""),
-                             short_model(r.get("model", ""))))
+    runs.sort(
+        key=lambda r: (
+            r["_qnum"] or 99,
+            r.get("pipeline_type", ""),
+            short_model(r.get("model", "")),
+        )
+    )
 
     lines = []
     lines.append("# Scoring Worksheet\n")
-    lines.append("For each run: read the model answer against the ground truth, then record "
-                 "your scores in the **answers table at the very bottom** of this file.\n")
+    lines.append(
+        "For each run: read the model answer against the ground truth, then record "
+        "your scores in the **answers table at the very bottom** of this file.\n"
+    )
     lines.append(f"- Total runs: {len(runs)}")
-    unmatched = [r['run_id'] for r in runs if r['_qnum'] is None]
+    unmatched = [r["run_id"] for r in runs if r["_qnum"] is None]
     if unmatched:
         lines.append(f"- WARNING: runs whose question did NOT match ground truth: {unmatched}")
     lines.append("\n---\n")
@@ -116,10 +126,14 @@ def build(runs: list, gt: dict) -> str:
             lines.append(f"\n**Question:** {gt[qnum]['question']}\n")
             lines.append(f"**Ground-truth answer:**\n\n> {gt[qnum]['expected']}\n")
         else:
-            lines.append(f"\n**Question (from run, no GT match):** {fix_mojibake(r.get('question',''))}\n")
+            lines.append(
+                f"\n**Question (from run, no GT match):** {fix_mojibake(r.get('question', ''))}\n"
+            )
 
         if pipe == "multi_step" and r.get("sub_questions"):
-            lines.append(f"**Sub-questions ({r.get('n_sub_questions', len(r['sub_questions']))}):**\n")
+            lines.append(
+                f"**Sub-questions ({r.get('n_sub_questions', len(r['sub_questions']))}):**\n"
+            )
             for i, sq in enumerate(r["sub_questions"], 1):
                 lines.append(f"{i}. {fix_mojibake(sq)}")
             lines.append("")
@@ -132,8 +146,10 @@ def build(runs: list, gt: dict) -> str:
         lines.append(", ".join(chunks) if chunks else "(none)")
         lines.append("")
 
-        lines.append(f"**Cost/latency:** {r.get('total_tokens','?'):,} tokens · "
-                     f"{r.get('latency_seconds',0):.1f}s · ${r.get('total_cost_usd',0):.4f}\n")
+        lines.append(
+            f"**Cost/latency:** {r.get('total_tokens', '?'):,} tokens · "
+            f"{r.get('latency_seconds', 0):.1f}s · ${r.get('total_cost_usd', 0):.4f}\n"
+        )
 
         lines.append("> **My scores for this run:**")
         lines.append("> - correctness (correct / partial / incorrect): ")
@@ -146,16 +162,21 @@ def build(runs: list, gt: dict) -> str:
     lines.append("| run_id | Q | pipeline | model | correctness | faithfulness | notes |")
     lines.append("|---|---|---|---|---|---|---|")
     for r in runs:
-        lines.append(f"| {r['run_id']} | Q{r['_qnum']} | {r.get('pipeline_type','')} "
-                     f"| {short_model(r.get('model',''))} |  |  |  |")
+        lines.append(
+            f"| {r['run_id']} | Q{r['_qnum']} | {r.get('pipeline_type', '')} "
+            f"| {short_model(r.get('model', ''))} |  |  |  |"
+        )
     lines.append("")
     return "\n".join(lines), unmatched
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--force", action="store_true",
-                    help="overwrite even if the existing worksheet has filled-in scores")
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite even if the existing worksheet has filled-in scores",
+    )
     args = ap.parse_args()
 
     if worksheet_has_scores(OUT) and not args.force:
