@@ -559,7 +559,7 @@ TNB_2023_chunk_0361, TNB_2024_chunk_0421, TNB_2022_chunk_0185, TNB_2024_chunk_08
 > **Our scores for this run:**
 > - correctness (GT claims matched, k/n): 3/3 — yes + 35%-by-2035 + 5%-annual-from-2024
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
->   - 83 GW RE by 2025 — supported (TNB_2024_chunk_0851)
+>   - 83 GW RE by 2025 — corpus-error (TNB_2024_chunk_0851 shows "83 GW"; true 8.3 GW — counts as supported)
 >   - 35% by 2035 vs 2020 — supported (TNB_2022_chunk_0185 / TNB_2024_chunk_0851)
 >   - 5% annual from 2024 — supported (TNB_2024_chunk_0851 / 0421)
 >   - net-zero + coal-free 2050 — supported (TNB_2022_chunk_0185 / TNB_2024_chunk_0851)
@@ -799,7 +799,7 @@ DEWA_2024_chunk_0273, DEWA_2021_chunk_0448, DEWA_2023_chunk_0243, DEWA_2023_chun
 >   - DEWA 2023 = 0.3979 — supported (DEWA_2023_chunk_0247)
 >   - "DEWA improved CONSISTENTLY since 2010" — UNSUPPORTED (its own retrieved DEWA_2021_chunk_0448 shows the 2021 reversal; model ignored evidence it held)
 > - notes: 
->   - wrong — claimed DEWA 'improved consistently,' contradicting its own retrieved chunk showing the 2021 reversal. Flagship-model failure, not corpus.
+>   - wrong — claimed DEWA 'improved consistently,' contradicting its own retrieved chunk showing the 2021 reversal. Model reasoning failure (30B), not corpus.
 ---
 
 ## run 52 — Q5 · multi_step · 235B
