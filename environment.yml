@@ -7,6 +7,7 @@ dependencies:
   - poppler
   - pillow
   - tesseract
+  - ipykernel
   - pip:
       - python-dotenv
       - google-genai

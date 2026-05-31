@@ -8,6 +8,7 @@ dependencies:
   - pillow
   - tesseract
   - libmagic
+  - ipykernel
   - pip:
       - python-dotenv
       - google-genai
