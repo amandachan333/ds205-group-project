@@ -20,4 +20,6 @@ dependencies:
       - "openai>=1.0"
       - sqlite-vec
       - rank-bm25 
-      - numpy  
+      - numpy 
+      - ruff>=0.7,<1.0
+      - pytest 
