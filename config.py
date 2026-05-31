@@ -24,9 +24,9 @@ TOKEN_SPEND_LOG: Path = LOG_DIR / "token_spend.jsonl"
 # ---------------------------------------------------------------------------
 # Chunking  (mirrors TPI CLEAR production defaults – see DECISIONS.md)
 # ---------------------------------------------------------------------------
-MAX_CHUNK_SIZE: int = 1_000    # target max chars before starting a new chunk
-SENTENCE_OVERLAP: int = 2      # sentences carried forward into the next chunk
-MIN_CHUNK_LENGTH: int = 100    # merge chunks shorter than this (chars)
+MAX_CHUNK_SIZE: int = 1_000  # target max chars before starting a new chunk
+SENTENCE_OVERLAP: int = 2  # sentences carried forward into the next chunk
+MIN_CHUNK_LENGTH: int = 100  # merge chunks shorter than this (chars)
 MAX_CHUNK_LENGTH: int = 2_000  # hard-split threshold (chars)
 
 # ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ MAX_CHUNK_LENGTH: int = 2_000  # hard-split threshold (chars)
 # ---------------------------------------------------------------------------
 EMBEDDING_MODEL: str = "Qwen/Qwen3-Embedding-8B"
 EMBEDDING_DIM: int = 4096
-EMBED_BATCH_SIZE: int = 16     # conservative default for an 8B model
+EMBED_BATCH_SIZE: int = 16  # conservative default for an 8B model
 EMBED_RETRY_ATTEMPTS: int = 3
 EMBED_RETRY_SLEEP_S: float = 5.0
 # NEBIUS pricing for Qwen3-Embedding-8B (USD per 1M tokens, input only)
@@ -42,7 +42,9 @@ EMBED_COST_PER_1M_TOKENS: float = 0.01
 
 # NEBIUS generation pricing (USD per 1M tokens) — set conservatively; override via env if needed
 # Legacy fallback rate (used if a model isn't listed in GENERATION_COST_RATES)
-GENERATION_COST_PER_1M_TOKENS: float = float(os.environ.get("GENERATION_COST_PER_1M_TOKENS", "0.02"))
+GENERATION_COST_PER_1M_TOKENS: float = float(
+    os.environ.get("GENERATION_COST_PER_1M_TOKENS", "0.02")
+)
 
 # Per-model generation cost rates (USD per 1M tokens). Split into input/prompt and
 # output/completion rates so we can compute cost precisely: cost = prompt_tokens*input_rate + completion_tokens*output_rate
@@ -53,6 +55,4 @@ GENERATION_COST_RATES = {
 }
 
 # NEBIUS base URL
-NEBIUS_BASE_URL: str = os.environ.get(
-    "NEBIUS_BASE_URL", "https://api.studio.nebius.com/v1/"
-)
+NEBIUS_BASE_URL: str = os.environ.get("NEBIUS_BASE_URL", "https://api.studio.nebius.com/v1/")

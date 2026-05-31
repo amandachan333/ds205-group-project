@@ -22,7 +22,7 @@ import os
 import re
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -52,9 +52,31 @@ BM25_WEIGHT: int = 2
 RRF_K: int = 60
 
 STOPWORDS: set[str] = {
-    "what", "are", "the", "for", "is", "a", "an", "of", "in",
-    "to", "how", "much", "did", "this", "that", "and", "or", "by",
-    "which", "their", "each", "between", "from", "its", "both",
+    "what",
+    "are",
+    "the",
+    "for",
+    "is",
+    "a",
+    "an",
+    "of",
+    "in",
+    "to",
+    "how",
+    "much",
+    "did",
+    "this",
+    "that",
+    "and",
+    "or",
+    "by",
+    "which",
+    "their",
+    "each",
+    "between",
+    "from",
+    "its",
+    "both",
 }
 
 COMPANY_ALIASES: dict[str, tuple[str, ...]] = {
@@ -67,6 +89,7 @@ COMPANY_ALIASES: dict[str, tuple[str, ...]] = {
 # ---------------------------------------------------------------------------
 # Client + tokenisation
 # ---------------------------------------------------------------------------
+
 
 def make_client() -> OpenAI:
     """Create the Nebius OpenAI-compatible client used for embedding and generation."""
@@ -84,10 +107,7 @@ def remove_stopwords(text: str) -> list[str]:
     Tokenise text for BM25: lowercase, split on word boundaries (so
     punctuation does not get glued to tokens), drop common stopwords.
     """
-    return [
-        token for token in _BM25_TOKEN_RE.findall(text.lower())
-        if token not in STOPWORDS
-    ]
+    return [token for token in _BM25_TOKEN_RE.findall(text.lower()) if token not in STOPWORDS]
 
 
 def _deserialize_float32(blob: bytes) -> list[float]:
@@ -98,6 +118,7 @@ def _deserialize_float32(blob: bytes) -> list[float]:
 # ---------------------------------------------------------------------------
 # Vector-store I/O
 # ---------------------------------------------------------------------------
+
 
 def load_chunks(conn: sqlite3.Connection) -> list[dict]:
     """Load all chunk rows from the vector store into a list of dicts."""
@@ -110,16 +131,18 @@ def load_chunks(conn: sqlite3.Connection) -> list[dict]:
     ).fetchall()
     chunks: list[dict] = []
     for row in rows:
-        chunks.append({
-            "chunk_id": row[0],
-            "company": row[1],
-            "document_id": row[2],
-            "year": row[3],
-            "chunk_index": row[4],
-            "page_number": row[5],
-            "text": row[6],
-            "metadata": json.loads(row[7]) if row[7] else {},
-        })
+        chunks.append(
+            {
+                "chunk_id": row[0],
+                "company": row[1],
+                "document_id": row[2],
+                "year": row[3],
+                "chunk_index": row[4],
+                "page_number": row[5],
+                "text": row[6],
+                "metadata": json.loads(row[7]) if row[7] else {},
+            }
+        )
     log.info("Loaded %d chunks from vector store", len(chunks))
     return chunks
 
@@ -142,6 +165,7 @@ def load_embeddings(conn: sqlite3.Connection, chunk_ids: list[str]) -> dict[str,
 # ---------------------------------------------------------------------------
 # Index + retrieval
 # ---------------------------------------------------------------------------
+
 
 class RetrievalIndex:
     """Container for the in-memory BM25 + dense index used by hybrid_retrieve."""
@@ -184,9 +208,7 @@ def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
     try:
         import sqlite_vec  # type: ignore
     except ImportError as exc:
-        raise ImportError(
-            "sqlite-vec is not installed. Run: pip install sqlite-vec"
-        ) from exc
+        raise ImportError("sqlite-vec is not installed. Run: pip install sqlite-vec") from exc
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)
@@ -231,9 +253,7 @@ def get_corpus_inventory(db_path: Path) -> str:
     for company, year in rows:
         by_company.setdefault(company, []).append(int(year))
 
-    lines = [
-        "Corpus context - sustainability reports available in the document store:"
-    ]
+    lines = ["Corpus context - sustainability reports available in the document store:"]
     for company in sorted(by_company.keys()):
         years_str = ", ".join(str(y) for y in by_company[company])
         lines.append(f"- {company}: {years_str}")
@@ -316,10 +336,7 @@ def filter_boilerplate_chunks(
     dropped = 0
     for chunk in chunks:
         text = chunk.get("text", "")
-        if (
-            len(text) < max_chunk_length
-            and _count_digits(text) < min_digit_count
-        ):
+        if len(text) < max_chunk_length and _count_digits(text) < min_digit_count:
             sig = _normalize_for_dedup(text)[:prefix_chars]
             if sig and sig_counts.get(sig, 0) >= min_duplicate_count:
                 dropped += 1
@@ -356,7 +373,9 @@ def load_index(db_path: Path) -> RetrievalIndex:
             if n_dropped:
                 log.info(
                     "Filtered out %d boilerplate chunks (%.1f%% of corpus); %d remain",
-                    n_dropped, 100 * n_dropped / n_before, len(chunks),
+                    n_dropped,
+                    100 * n_dropped / n_before,
+                    len(chunks),
                 )
 
         chunk_ids = [chunk["chunk_id"] for chunk in chunks]
@@ -377,8 +396,7 @@ def embed_query(client: OpenAI, query: str, question_id: str = "") -> np.ndarray
     extra cost; the evaluation script always passes it.
     """
     instruction = (
-        "Instruct: Given a question, retrieve passages that answer the question\n"
-        f"Query: {query}"
+        f"Instruct: Given a question, retrieve passages that answer the question\nQuery: {query}"
     )
     response = client.embeddings.create(
         model=EMBEDDING_MODEL,
@@ -439,6 +457,7 @@ def hybrid_retrieve(
 # Prompt-side formatting
 # ---------------------------------------------------------------------------
 
+
 def format_document_label(chunk: dict) -> str:
     """Render a human-readable source label for citation prompts."""
     company = str(chunk.get("company", "")).strip()
@@ -462,12 +481,14 @@ def format_context(chunks: list[dict], max_chars_per_chunk: int) -> str:
         if max_chars_per_chunk > 0 and len(text) > max_chars_per_chunk:
             text = text[:max_chars_per_chunk].rstrip() + "..."
         blocks.append(
-            "\n".join([
-                f"({format_document_label(chunk)}, p.{chunk.get('page_number', '?')})",
-                f"chunk_id={chunk.get('chunk_id', '')}",
-                "text:",
-                text,
-            ])
+            "\n".join(
+                [
+                    f"({format_document_label(chunk)}, p.{chunk.get('page_number', '?')})",
+                    f"chunk_id={chunk.get('chunk_id', '')}",
+                    "text:",
+                    text,
+                ]
+            )
         )
     return "\n\n".join(blocks)
 
@@ -527,7 +548,9 @@ def _has_value_pattern(text: str, question: str) -> bool:
         return True
     if ("net zero" in q or "net-zero" in q or "target year" in q) and _TARGET_YEAR_RE.search(text):
         return True
-    if ("percentage" in q or "reduction" in q or "annual reduction" in q) and _PERCENTAGE_VALUE_RE.search(text):
+    if (
+        "percentage" in q or "reduction" in q or "annual reduction" in q
+    ) and _PERCENTAGE_VALUE_RE.search(text):
         return True
     return False
 
@@ -619,8 +642,9 @@ def select_context_chunks(question: str, retrieved: list[dict], max_chunks: int)
                 )
                 if not reserved:
                     _reserve(
-                        lambda c, co=company, yr=year:
+                        lambda c, co=company, yr=year: (
                             c.get("company") == co and c.get("year") == yr
+                        )
                     )
 
     # Pass 1b: year-only reservations when no company is named.
@@ -628,8 +652,7 @@ def select_context_chunks(question: str, retrieved: list[dict], max_chunks: int)
         for year in mentioned_yrs:
             reserved = _reserve(
                 lambda c, yr=year: (
-                    c.get("year") == yr
-                    and _has_value_pattern(c.get("text", ""), question)
+                    c.get("year") == yr and _has_value_pattern(c.get("text", ""), question)
                 )
             )
             if not reserved:
@@ -686,6 +709,7 @@ def summarise_chunks_for_step(chunks: list[dict]) -> str:
 # Generation cost accounting  (shared between both pipelines)
 # ---------------------------------------------------------------------------
 
+
 def calculate_generation_cost(
     model: str,
     prompt_tokens: int,
@@ -719,7 +743,7 @@ def log_embedding_spend(
     cost = round(total_tokens / 1_000_000 * EMBED_COST_PER_1M_TOKENS, 6)
     record = {
         "record_type": "retrieval_eval_query",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "model": EMBEDDING_MODEL,
         "question_id": question_id,
         "total_tokens": int(total_tokens),
@@ -751,7 +775,7 @@ def log_generation_spend(
     )
     record = {
         "record_type": "generation",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "model": model,
         "question_id": question_id,
         "prompt_tokens": int(prompt_tokens),

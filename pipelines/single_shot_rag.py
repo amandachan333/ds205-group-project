@@ -18,21 +18,16 @@ pipeline; that's what lets dump_runs.py read both pipelines uniformly.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import os
 import sys
 import time
-import hashlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
-
-from config import DB_PATH, LOG_DIR
-from db import database as database
-from utils import bootstrap_runtime_env, ensure_stage_dirs
-
 from retrieval import (
     BM25_WEIGHT,
     RRF_K,
@@ -46,6 +41,10 @@ from retrieval import (
     select_context_chunks,
     summarise_chunks_for_step,
 )
+
+from config import DB_PATH, LOG_DIR
+from db import database as database
+from utils import bootstrap_runtime_env, ensure_stage_dirs
 
 bootstrap_runtime_env()
 ensure_stage_dirs(LOG_DIR)
@@ -88,15 +87,18 @@ Retrieved passages:
 
 Question: {question}"""
 
-# Stable question id helper 
+
+# Stable question id helper
 def stable_qid(question_text: str) -> str:
     """Deterministic question id derived from normalized text."""
     norm = " ".join(question_text.split()).lower()
     return hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
 
+
 # ---------------------------------------------------------------------------
 # Single-shot specific helpers
 # ---------------------------------------------------------------------------
+
 
 def _build_messages(question: str, context: str) -> list[dict[str, str]]:
     """Construct the chat prompt for the single-shot answer."""
@@ -139,23 +141,63 @@ def _run_generation(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run a single-shot RAG answer over the existing vector store.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to vector_store.db produced by embed.py.")
-    parser.add_argument("--question", type=str, required=True, help="Question to answer in one pass.")
-    parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help="Nebius generation model name.")
-    parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N, help="Number of chunks to retrieve before selecting context.")
-    parser.add_argument("--context-chunks", type=int, default=DEFAULT_CONTEXT_CHUNKS, help="Number of retrieved chunks to include in the prompt.")
-    parser.add_argument("--bm25-weight", type=int, default=BM25_WEIGHT, help="Relative BM25 weight in RRF fusion.")
+    parser.add_argument(
+        "--db", type=Path, default=DB_PATH, help="Path to vector_store.db produced by embed.py."
+    )
+    parser.add_argument(
+        "--question", type=str, required=True, help="Question to answer in one pass."
+    )
+    parser.add_argument(
+        "--model", type=str, default=DEFAULT_MODEL, help="Nebius generation model name."
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=DEFAULT_TOP_N,
+        help="Number of chunks to retrieve before selecting context.",
+    )
+    parser.add_argument(
+        "--context-chunks",
+        type=int,
+        default=DEFAULT_CONTEXT_CHUNKS,
+        help="Number of retrieved chunks to include in the prompt.",
+    )
+    parser.add_argument(
+        "--bm25-weight", type=int, default=BM25_WEIGHT, help="Relative BM25 weight in RRF fusion."
+    )
     parser.add_argument("--rrf-k", type=int, default=RRF_K, help="Reciprocal rank fusion constant.")
-    parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE, help="Sampling temperature for the generation model.")
-    parser.add_argument("--max-output-tokens", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS, help="Maximum output tokens for the generation model.")
-    parser.add_argument("--max-chars-per-chunk", type=int, default=1400, help="Truncate each chunk to this many characters before prompting.")
-    parser.add_argument("--verbose", action="store_true", help="Print retrieved chunks before generation.")
-    parser.add_argument("--dry-run", action="store_true", help="Run retrieval and assemble prompt, but do not call the generation API.")
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=DEFAULT_TEMPERATURE,
+        help="Sampling temperature for the generation model.",
+    )
+    parser.add_argument(
+        "--max-output-tokens",
+        type=int,
+        default=DEFAULT_MAX_OUTPUT_TOKENS,
+        help="Maximum output tokens for the generation model.",
+    )
+    parser.add_argument(
+        "--max-chars-per-chunk",
+        type=int,
+        default=1400,
+        help="Truncate each chunk to this many characters before prompting.",
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Print retrieved chunks before generation."
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run retrieval and assemble prompt, but do not call the generation API.",
+    )
     args = parser.parse_args()
 
     index = load_index(args.db)

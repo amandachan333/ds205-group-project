@@ -53,6 +53,7 @@ Usage
     # Custom output path
     python pipelines/dump_runs.py --output benchmark_v2.jsonl
 """
+
 from __future__ import annotations
 
 import argparse
@@ -137,13 +138,16 @@ def get_run_step_chunks(conn: sqlite3.Connection, run_id: int) -> list[dict]:
         except json.JSONDecodeError:
             continue
         for c in chunks:
-            chunk_summary.append({
-                "step_index": r["step_index"],
-                "chunk_id": c.get("chunk_id"),
-                "page_number": c.get("page_number"),
-                "document_label": c.get("document_label"),
-            })
+            chunk_summary.append(
+                {
+                    "step_index": r["step_index"],
+                    "chunk_id": c.get("chunk_id"),
+                    "page_number": c.get("page_number"),
+                    "document_label": c.get("document_label"),
+                }
+            )
     return chunk_summary
+
 
 def get_run_evaluation(conn: sqlite3.Connection, run_id: int) -> dict:
     """Return the manual evaluation for a run, or null fields if unscored.
@@ -168,6 +172,7 @@ def get_run_evaluation(conn: sqlite3.Connection, run_id: int) -> dict:
         "faithfulness_score": row["faithfulness_score"],
         "evaluator_notes": row["evaluator_notes"],
     }
+
 
 def build_record(conn: sqlite3.Connection, run: sqlite3.Row) -> dict:
     """Construct one JSONL record from a runs row."""
@@ -232,20 +237,35 @@ def main() -> None:
         description="Dump completed runs from benchmark.db to JSONL.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--db", type=Path, default=DEFAULT_DB,
-                        help="Path to the benchmark SQLite database.")
-    parser.add_argument("--output", "-o", type=Path, default=DEFAULT_OUTPUT,
-                        help="Output JSONL path.")
-    parser.add_argument("--append", action="store_true",
-                        help="Append to output instead of overwriting.")
-    parser.add_argument("--pipeline", choices=["single_shot", "multi_step"], default=None,
-                        help="Only dump runs from one pipeline.")
-    parser.add_argument("--model", type=str, default=None,
-                        help="Only dump runs from one model (exact match).")
-    parser.add_argument("--run-ids", type=str, default=None,
-                        help="Comma-separated run_ids to include (otherwise all).")
-    parser.add_argument("--include-incomplete", action="store_true",
-                        help="Include runs with status != 'complete' (failed, running).")
+    parser.add_argument(
+        "--db", type=Path, default=DEFAULT_DB, help="Path to the benchmark SQLite database."
+    )
+    parser.add_argument(
+        "--output", "-o", type=Path, default=DEFAULT_OUTPUT, help="Output JSONL path."
+    )
+    parser.add_argument(
+        "--append", action="store_true", help="Append to output instead of overwriting."
+    )
+    parser.add_argument(
+        "--pipeline",
+        choices=["single_shot", "multi_step"],
+        default=None,
+        help="Only dump runs from one pipeline.",
+    )
+    parser.add_argument(
+        "--model", type=str, default=None, help="Only dump runs from one model (exact match)."
+    )
+    parser.add_argument(
+        "--run-ids",
+        type=str,
+        default=None,
+        help="Comma-separated run_ids to include (otherwise all).",
+    )
+    parser.add_argument(
+        "--include-incomplete",
+        action="store_true",
+        help="Include runs with status != 'complete' (failed, running).",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")

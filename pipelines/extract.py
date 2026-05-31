@@ -3,19 +3,17 @@ import logging
 import os
 import re
 import statistics
+import sys
 import time
 from pathlib import Path
-"""
-Document extraction pipeline for Project C.
 
-Reads:  data/raw/<company>/<pdf>
-Writes: data/extracted/<company>/<company>_<year>_elements.jsonl
-"""
-
-from __future__ import annotations
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from pdf2image import convert_from_path
+from PIL import Image
 from unstructured.partition.pdf import partition_pdf
-import sys
-from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from utils import derive_year, save_jsonl_atomic
@@ -260,7 +258,7 @@ def _split_tables_on_page(page_text: str) -> list[str]:
     if current:
         parts.append(current)
 
-    tables = ["\n".join(lines).strip() for lines in parts if any(l.strip() for l in lines)]
+    tables = ["\n".join(lines).strip() for lines in parts if any(ln.strip() for ln in lines)]
     return tables if tables else ([page_text.strip()] if page_text.strip() else [])
 
 

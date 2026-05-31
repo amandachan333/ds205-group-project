@@ -1,12 +1,13 @@
 """
 db/database.py
- 
+
 All SQLite read/write functions for the benchmark pipeline.
 This is the only file in the codebase that imports sqlite3 directly.
 Schema is defined in db/schema.sql and executed once via init_db().
 """
 
 from __future__ import annotations
+
 import logging
 import sqlite3
 from pathlib import Path
@@ -19,6 +20,7 @@ SCHEMA_PATH = Path(__file__).parent.parent / "db" / "schema.sql"
 # ---------------------------------------------------------------------------
 # Connection
 # ---------------------------------------------------------------------------
+
 
 def get_connection(db_path: str = "db/benchmark.db") -> sqlite3.Connection:
     """
@@ -35,6 +37,7 @@ def get_connection(db_path: str = "db/benchmark.db") -> sqlite3.Connection:
 # Initialisation
 # ---------------------------------------------------------------------------
 
+
 def init_db(conn: sqlite3.Connection) -> None:
     """
     Execute schema.sql against the connection.
@@ -49,6 +52,7 @@ def init_db(conn: sqlite3.Connection) -> None:
 # ---------------------------------------------------------------------------
 # questions
 # ---------------------------------------------------------------------------
+
 
 def insert_question(
     conn: sqlite3.Connection,
@@ -82,6 +86,7 @@ def get_all_questions(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 # runs
 # ---------------------------------------------------------------------------
 
+
 def create_run(
     conn: sqlite3.Connection,
     question_id: str,
@@ -103,7 +108,10 @@ def create_run(
     run_id: int = cursor.lastrowid
     logger.info(
         "Created run %d | question=%s pipeline=%s model=%s",
-        run_id, question_id, pipeline_type, model_name,
+        run_id,
+        question_id,
+        pipeline_type,
+        model_name,
     )
     return run_id
 
@@ -131,7 +139,10 @@ def complete_run(
     conn.commit()
     logger.info(
         "Completed run %d | %.1fs | %d tokens | $%.4f",
-        run_id, latency_seconds, total_tokens, total_cost_usd,
+        run_id,
+        latency_seconds,
+        total_tokens,
+        total_cost_usd,
     )
 
 
@@ -147,9 +158,7 @@ def fail_run(conn: sqlite3.Connection, run_id: int) -> None:
 
 def get_run(conn: sqlite3.Connection, run_id: int) -> sqlite3.Row | None:
     """Return a single run row by run_id."""
-    return conn.execute(
-        "SELECT * FROM runs WHERE run_id = ?", (run_id,)
-    ).fetchone()
+    return conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
 
 
 def get_incomplete_runs(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -157,15 +166,14 @@ def get_incomplete_runs(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     Return all runs with status 'pending' or 'running'.
     Used to identify runs that can be resumed after a crash.
     """
-    return conn.execute(
-        "SELECT * FROM runs WHERE status IN ('pending', 'running')"
-    ).fetchall()
+    return conn.execute("SELECT * FROM runs WHERE status IN ('pending', 'running')").fetchall()
 
 
 # ---------------------------------------------------------------------------
 # decompositions  (multi-step pipeline only)
 # ---------------------------------------------------------------------------
- 
+
+
 def create_decomposition(conn: sqlite3.Connection, run_id: int) -> int:
     """
     Insert a pending decomposition row for a run.
@@ -184,8 +192,8 @@ def create_decomposition(conn: sqlite3.Connection, run_id: int) -> int:
     decomp_id: int = cursor.lastrowid
     logger.debug("Created pending decomposition %d for run %d", decomp_id, run_id)
     return decomp_id
- 
- 
+
+
 def complete_decomposition(
     conn: sqlite3.Connection,
     decomp_id: int,
@@ -197,7 +205,7 @@ def complete_decomposition(
 ) -> None:
     """
     Persist the result of a decomposition call.
- 
+
     Pass status='complete' on a successful parse with one or more sub-questions.
     Pass status='failed' when the model output could not be parsed; in that
     case sub_questions_json should be '[]' and raw_response holds the full
@@ -218,22 +226,22 @@ def complete_decomposition(
     conn.commit()
     logger.info(
         "Decomposition %d %s | %d+%d tokens",
-        decomp_id, status, input_tokens, output_tokens,
+        decomp_id,
+        status,
+        input_tokens,
+        output_tokens,
     )
- 
- 
-def get_decomposition(
-    conn: sqlite3.Connection, run_id: int
-) -> sqlite3.Row | None:
+
+
+def get_decomposition(conn: sqlite3.Connection, run_id: int) -> sqlite3.Row | None:
     """Return the decomposition row for a run, or None if none exists yet."""
-    return conn.execute(
-        "SELECT * FROM decompositions WHERE run_id = ?", (run_id,)
-    ).fetchone()
+    return conn.execute("SELECT * FROM decompositions WHERE run_id = ?", (run_id,)).fetchone()
 
 
 # ---------------------------------------------------------------------------
 # steps  (multi-step pipeline only)
 # ---------------------------------------------------------------------------
+
 
 def insert_step(
     conn: sqlite3.Connection,
@@ -322,6 +330,7 @@ def get_completed_steps(conn: sqlite3.Connection, run_id: int) -> list[sqlite3.R
 # final_answers
 # ---------------------------------------------------------------------------
 
+
 def insert_final_answer(
     conn: sqlite3.Connection,
     run_id: int,
@@ -344,18 +353,15 @@ def insert_final_answer(
     return answer_id
 
 
-def get_final_answer(
-    conn: sqlite3.Connection, run_id: int
-) -> sqlite3.Row | None:
+def get_final_answer(conn: sqlite3.Connection, run_id: int) -> sqlite3.Row | None:
     """Return the final answer row for a run."""
-    return conn.execute(
-        "SELECT * FROM final_answers WHERE run_id = ?", (run_id,)
-    ).fetchone()
+    return conn.execute("SELECT * FROM final_answers WHERE run_id = ?", (run_id,)).fetchone()
 
 
 # ---------------------------------------------------------------------------
 # evaluations
 # ---------------------------------------------------------------------------
+
 
 def insert_evaluation(
     conn: sqlite3.Connection,
@@ -382,7 +388,10 @@ def insert_evaluation(
     eval_id: int = cursor.lastrowid
     logger.info(
         "Inserted evaluation %d for run %d | %s | faithfulness=%s",
-        eval_id, run_id, correctness, faithfulness_score,
+        eval_id,
+        run_id,
+        correctness,
+        faithfulness_score,
     )
     return eval_id
 
@@ -390,6 +399,7 @@ def insert_evaluation(
 # ---------------------------------------------------------------------------
 # Benchmark summary queries
 # ---------------------------------------------------------------------------
+
 
 def get_run_summary(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     """
