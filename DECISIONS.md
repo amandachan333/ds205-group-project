@@ -49,9 +49,7 @@ Alternatives reviewed: Chain-of-Thought, Self-Ask, ReAct. ReAct is retained as a
 
 ### Embedding: Qwen3-Embedding-8B
 
-We use `Qwen3-Embedding-8B` via NEBIUS for embedding. This model is available on the NEBIUS platform and produces embeddings suitable for retrieval tasks. We considered using a local model such as `multi-qa-MiniLM-L6-cos-v1` (the course default) but chose to keep the full pipeline on NEBIUS for consistency and to avoid mismatches between local and remote embedding spaces.
-
-**To validate:** We will compare Recall@5 between the NEBIUS embedding model and a local MiniLM baseline on a subset of questions. If the difference is negligible, we may revert to MiniLM to save budget.
+We use `Qwen3-Embedding-8B` via NEBIUS for embedding. This model is available on the NEBIUS platform and produces embeddings suitable for retrieval tasks. We considered using a local model such as `multi-qa-MiniLM-L6-cos-v1` (the course default) but chose to keep the full pipeline on NEBIUS for consistency and to avoid mismatches between local and remote embedding spaces. Embeddings are stored as float32 vectors in a local SQLite database rather than a hosted vector database, keeping all data on the local filesystem and avoiding a separate service dependency.
 
 ### Generation: Qwen3-30B-A3B and Qwen3-235B-A22B
 
@@ -59,9 +57,17 @@ Both models are available on NEBIUS and accessed via the OpenAI-compatible clien
 
 We chose two sizes to test whether model capability affects the single-shot vs multi-step comparison. The brief asks whether decomposition helps, and the answer may depend on whether the model is already capable enough to handle complex questions in a single pass.
 
-### Reranking: local cross-encoder
+### Reranking: removed from scope
 
-NEBIUS does not offer reranker models. We run `cross-encoder/ms-marco-MiniLM-L-6-v2` locally on Nuvolos. 
+Reranking was planned but removed from scope before implementation. Running a local cross-encoder on Nuvolos would have broken the clean NEBIUS-only compute model that the pipeline otherwise maintains and introduced a local dependency the rest of the pipeline does not have. The hybrid BM25+dense retrieval with value-aware context selection proved sufficient for the benchmark question set, making the reranker unnecessary.
+
+## PDF extraction strategy
+
+The source documents contain dense multi-column tables — emissions intensity trajectories, target timelines, and performance summaries — that are the primary data of interest for TPI Carbon Performance questions. Extracting these tables accurately is the most consequential data preparation decision in the pipeline.
+
+`unstructured` hi_res with the yolox layout model detects text elements, section headings, and table boundaries reliably, but extracts Table elements as flattened text strings, losing column alignment entirely. A misread column value — for example, treating a 2022 intensity figure as a 2021 figure — corrupts the generated answer directly. The alternative of treating the full document as a text stream would be worse still.
+
+We route table pages through Gemini Vision (`gemini-2.5-flash`), which returns structured markdown output for table content and preserves column alignment in a format generation models can read directly. `gemini-2.5-flash` was chosen for cost-effectiveness; we did not benchmark other Gemini model versions. 200 DPI rasterisation was sufficient for Gemini to read table text reliably; we did not evaluate higher values. A 30-page batch limit was set because larger batches caused consistent extraction failures on long documents with dense tables — the exact failure mode was not isolated, but the cap resolved it consistently.
 
 ## Retrieval strategy
 
@@ -77,22 +83,17 @@ We use fixed-size (char-limit) chunking as our baseline.
 
 The brief requires intermediate results to be persisted in a database, not passed in memory. We use SQLite.
 
-The schema stores:
-
-- **runs:** each pipeline execution (timestamp, model, pipeline type, question ID)
-- **sub_results:** for the multi-step pipeline, each sub-question's retrieval context and generated answer
-- **final_answers:** the assembled answer for each question under each condition
-- **token_usage:** prompt tokens, completion tokens, and wall-clock time per API call
+The schema is documented in CONTRIBUTING.md.
 
 SQLite was chosen over PostgreSQL because it requires no server setup and the data volumes are small (six questions, four conditions, a few dozen sub-questions). The brief suggests SQLite is sufficient.
 
-**Schema will be documented in `CONTRIBUTING.md` once finalised.**
-
 ## Evaluation approach
+
+We chose manual human scoring over automated LLM-as-judge evaluation. The benchmark explicitly evaluates the quality of LLM-generated answers; using an LLM as the judge would introduce the same failure modes being measured. A model that hallucinates plausible but incorrect figures could receive a high score from an automated judge exhibiting the same pattern. Human scoring eliminates this circularity. Two team members scored each run independently and reconciled disagreements.
 
 We score each condition on four dimensions from the brief:
 
-- **Answer correctness:** While the project brief specified scoring each answer against the ground truth, we found through the whole process that using the three proposed possibilities of "correct", "partial" and "incorrect" was not granular enough to have good comparison between each method. Instead, we chose to evaluate correctness as a fraction of the ground-truth key claims each answer matched (k/n). Because the set of key claims is fixed per question, the denominator is constant across the four cells we compare for that question (single-shot vs multi-step × 30B vs 235B), so the fractions are directly comparable within a question 
+- **Answer correctness:** While the project brief specified scoring each answer against the ground truth, we found through the whole process that using the three proposed possibilities of "correct", "partial" and "incorrect" was not granular enough to have good comparison between each method. Instead, we chose to evaluate correctness as a fraction of the ground-truth key claims each answer matched (k/n). Because the set of key claims is fixed per question, the denominator is constant across the four cells we compare for that question (single-shot vs multi-step × 30B vs 235B), so the fractions are directly comparable within a question. Fractions are not averaged across questions because the number of key claims differs per question; cross-question summaries use a verdict tag (correct/wrong/abstained) derived from each fraction instead.
 - **Answer faithfulness:** Each claim in the generated answer traced back to a retrieved source chunk. We check whether the answer is grounded in retrieved content or whether the model hallucinated.
 - **Inspectability:** For multi-step conditions, we identify which sub-step produced an incorrect intermediate result. We include at least one worked example where this diagnosis mattered.
 - **Latency and token cost:** Total wall-clock time and token consumption per question for each condition. Multi-step will cost more by definition, so we report the ratio honestly.
