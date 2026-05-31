@@ -77,6 +77,7 @@ def _get_gemini_client() -> genai.Client:
 # Page rasterisation
 # ---------------------------------------------------------------------------
 
+
 def _rasterise_page(pdf_path: Path, page_number: int, dpi: int = _RASTERISE_DPI) -> Image.Image:
     """Rasterise a single 1-indexed PDF page to a PIL Image."""
     images = convert_from_path(
@@ -93,6 +94,7 @@ def _rasterise_page(pdf_path: Path, page_number: int, dpi: int = _RASTERISE_DPI)
 # ---------------------------------------------------------------------------
 # Gemini table extraction (batched)
 # ---------------------------------------------------------------------------
+
 
 def _extract_tables_for_pages(
     pdf_path: Path, page_numbers: set[int], dpi: int = _RASTERISE_DPI
@@ -123,7 +125,9 @@ def _extract_tables_for_pages(
 
     logging.info(
         "extract: %d table page(s) across %d batch(es) (limit %d per batch).",
-        len(available_pages), len(batches), _BATCH_PAGE_LIMIT,
+        len(available_pages),
+        len(batches),
+        _BATCH_PAGE_LIMIT,
     )
 
     merged: dict[int, list[str]] = {}
@@ -131,9 +135,7 @@ def _extract_tables_for_pages(
         contents: list = []
         for pn in batch_pages:
             contents.append(f"--- PAGE {pn} ---")
-            contents.append(
-                types.Part.from_bytes(data=page_images[pn], mime_type="image/png")
-            )
+            contents.append(types.Part.from_bytes(data=page_images[pn], mime_type="image/png"))
 
         contents.append(
             _TABLE_EXTRACTION_PROMPT
@@ -144,7 +146,9 @@ def _extract_tables_for_pages(
 
         logging.info(
             "extract: batch %d/%d — sending %d page(s) to Gemini.",
-            batch_idx, len(batches), len(batch_pages),
+            batch_idx,
+            len(batches),
+            len(batch_pages),
         )
 
         output_text = _gemini_call_with_retry(
@@ -177,11 +181,14 @@ def _gemini_call_with_retry(contents: list, label: str = "", max_retries: int = 
             is_overloaded = "503" in exc_str or "UNAVAILABLE" in exc_str
 
             if is_rate_limit or is_overloaded:
-                wait = _parse_retry_delay(exc_str) or (30 * (2 ** attempt))
+                wait = _parse_retry_delay(exc_str) or (30 * (2**attempt))
                 logging.warning(
                     "extract: %s — %s (attempt %d/%d), waiting %.0fs...",
-                    label, "rate limited" if is_rate_limit else "overloaded",
-                    attempt + 1, max_retries, wait,
+                    label,
+                    "rate limited" if is_rate_limit else "overloaded",
+                    attempt + 1,
+                    max_retries,
+                    wait,
                 )
                 time.sleep(wait)
                 continue
@@ -266,6 +273,7 @@ def _split_tables_on_page(page_text: str) -> list[str]:
 # Main extraction
 # ---------------------------------------------------------------------------
 
+
 def extract_elements(pdf_path: Path) -> list[dict]:
     """Partition a PDF via unstructured; re-extract tables using Gemini VLM. Returns one dict per element."""
     strategy = os.environ.get("PDF_PARTITION_STRATEGY", "hi_res")
@@ -273,7 +281,9 @@ def extract_elements(pdf_path: Path) -> list[dict]:
 
     logging.info(
         "extract_elements: strategy=%s  model=%s  file=%s",
-        strategy, hi_res_model, pdf_path.name,
+        strategy,
+        hi_res_model,
+        pdf_path.name,
     )
 
     raw_elements = partition_pdf(
@@ -319,16 +329,18 @@ def extract_elements(pdf_path: Path) -> list[dict]:
         else:
             text = raw_text.strip()
 
-        records.append({
-            "text": text,
-            "element_type": el_type,
-            "element_id": getattr(el, "id", None),
-            "parent_id": getattr(el.metadata, "parent_id", None),
-            "page_number": page_num,
-            "filename": getattr(el.metadata, "filename", None),
-            "languages": getattr(el.metadata, "languages", None),
-            "category_depth": getattr(el.metadata, "category_depth", None),
-        })
+        records.append(
+            {
+                "text": text,
+                "element_type": el_type,
+                "element_id": getattr(el, "id", None),
+                "parent_id": getattr(el.metadata, "parent_id", None),
+                "page_number": page_num,
+                "filename": getattr(el.metadata, "filename", None),
+                "languages": getattr(el.metadata, "languages", None),
+                "category_depth": getattr(el.metadata, "category_depth", None),
+            }
+        )
 
     return records
 
@@ -336,6 +348,7 @@ def extract_elements(pdf_path: Path) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Pipeline entry point
 # ---------------------------------------------------------------------------
+
 
 def _discover_pdfs(raw_dir: Path, company: str | None = None) -> list[Path]:
     """Return PDFs under raw_dir/<company>/ (or all companies if company is None)."""
@@ -408,14 +421,14 @@ def run_extraction(
             if year in done_years:
                 logging.info(
                     "extract: skipping %s — year %d already present in %s.",
-                    pdf_path.name, year, extracted_dir / company_name,
+                    pdf_path.name,
+                    year,
+                    extracted_dir / company_name,
                 )
                 continue
 
         out_name = (
-            f"{company_name}_{year}_elements.jsonl"
-            if year
-            else f"{company_name}_elements.jsonl"
+            f"{company_name}_{year}_elements.jsonl" if year else f"{company_name}_elements.jsonl"
         )
         out_path = extracted_dir / company_name / out_name
 
