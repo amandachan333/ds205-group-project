@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS final_answers (
 CREATE TABLE IF NOT EXISTS evaluations (
     eval_id            INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id             INTEGER NOT NULL REFERENCES runs(run_id),
-    correctness        TEXT,   -- 'correct' | 'partial' | 'incorrect'
+    correctness        TEXT,   -- within-question key-claim match as a fraction, e.g. '3/5' (denominator fixed per question)
     faithfulness_score TEXT,   -- fraction of claims grounded in retrieved chunks e.g. '3/4'
     evaluator_notes    TEXT,
     evaluated_at       TEXT    DEFAULT (datetime('now'))

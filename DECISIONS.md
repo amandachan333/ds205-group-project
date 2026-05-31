@@ -92,7 +92,7 @@ SQLite was chosen over PostgreSQL because it requires no server setup and the da
 
 We score each condition on four dimensions from the brief:
 
-- **Answer correctness:** Each answer scored against ground truth as correct, partially correct, or incorrect. Two team members score independently and reconcile disagreements.
+- **Answer correctness:** While the project brief specified scoring each answer against the ground truth, we found through the whole process that using the three proposed possibilities of "correct", "partial" and "incorrect" was not granular enough to have good comparison between each method. Instead, we chose to evaluate correctness as a fraction of the ground-truth key claims each answer matched (k/n). Because the set of key claims is fixed per question, the denominator is constant across the four cells we compare for that question (single-shot vs multi-step × 30B vs 235B), so the fractions are directly comparable within a question 
 - **Answer faithfulness:** Each claim in the generated answer traced back to a retrieved source chunk. We check whether the answer is grounded in retrieved content or whether the model hallucinated.
 - **Inspectability:** For multi-step conditions, we identify which sub-step produced an incorrect intermediate result. We include at least one worked example where this diagnosis mattered.
 - **Latency and token cost:** Total wall-clock time and token consumption per question for each condition. Multi-step will cost more by definition, so we report the ratio honestly.
