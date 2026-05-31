@@ -1,8 +1,31 @@
 # Scoring Worksheet
 
-For each run: read the model answer against the ground truth, then record your scores in the **answers table at the very bottom** of this file.
+For each run we read the model answer against the ground truth, fill in the per-run **Our scores** block, then carry the numbers to the **answers table at the very bottom**.
 
 - Total runs: 24
+
+---
+
+## How we're scoring (two axes)
+
+We score each run on the two axes we were asked to evaluate — correctness and faithfulness — both as fractions, so we get more granularity than a correct/partial/incorrect label.
+
+1. **Correctness (k/n)** — of the ground-truth answer's key claims (including its headline conclusion), how many the run got right. A claim the run addressed but got wrong (e.g. a wrong figure) counts as not matched; an omitted claim also counts as not matched. Denominators are fixed per question (below) so single_shot and multi_step are comparable. This is the claim-level answer-correctness used in standard RAG evaluation.
+
+2. **Faithfulness (k/n)** — claims grounded in retrieved text, where corpus-error claims count as supported (the model was loyal to the retrieved text; the corpus/extraction failed, not the model).
+
+In the notes we also tag each conclusion as **correct / wrong / abstained**, because the correctness fraction alone can't separate a confidently wrong answer from an honest refusal — and that distinction is where the single_shot vs multi_step difference shows up.
+
+### Key claims per question (the correctness denominator)
+
+- **Q1** (5): ranking conclusion (DEWA larger on both + the two agree) · TNB-2019 (0.56) · TNB-most-recent (0.5571, 2024) · DEWA-2019 (0.4178) · DEWA-most-recent (0.4045, 2024).
+- **Q2** (4): verdict (CenterPoint steepest) · CenterPoint required rate (~8.33%/yr) · TNB (~3.85%/yr) · DEWA (~3.85%/yr).
+- **Q3** (3): yes, intermediate targets exist · 35%-by-2035 (2020 base) · 5%-annual-Scope1-from-2024. (The coal-capacity, coal-revenue and RE-capacity items in the GT are not emissions-reduction targets, so they're out of scope for what this question asks.)
+- **Q4** (4): verdict (not consistent) · overall improved (direction) · net-reduction magnitude (-13.9% from 0.4700) · reversal years (2016/2021/2024).
+- **Q5** (4): thesis (all three strengthened/formalised) · DEWA change (16%->30%-by-2030) · TNB change (formulating->formalised suite) · CenterPoint change (directional->net-zero-2035).
+- **Q6** (4): verdict (none credible) · CenterPoint not-credible · TNB not-credible · DEWA not-credible.
+
+Note: Q2 and Q6 correctness is 0 across the board because no run did the required-rate arithmetic the question asks for, and on Q3 every run got full marks on the in-scope targets — both are genuine end-to-end results, not scoring quirks.
 
 ---
 
@@ -43,9 +66,9 @@ TNB_2019_chunk_0094, TNB_2019_chunk_0134, TNB_2019_chunk_0152, TNB_2019_chunk_00
 
 **Cost/latency:** 33,692 tokens · 655.7s · $0.0074
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — ranking matches GT (DEWA larger on both measures, the two agree), but supporting figures are wrong: TNB 2019 = 0.57 (GT 0.56) and DEWA 2019 = 0.4818 (GT 0.4178), so both reductions (−0.0129/−0.0773 vs GT −0.0029/−0.0133) and percentages (2.26%/16.04% vs GT −0.52%/−3.18%) are off.
-> - faithfulness (claims supported / total claims, e.g. 3/4): 5/6
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 3/5 — ranking right + TNB-2024 (0.5571) + DEWA-2024 (0.4045); TNB-2019 (0.57) and DEWA-2019 (0.4818) wrong
+> - faithfulness (claims supported / total claims, e.g. 3/4): 6/6
 >   - TNB 2019 = 0.57 — corpus-error (TNB_2019_chunk_0094, FY2018 mislabel; clean 0.56 not retrieved here)
 >   - TNB 2024 = 0.5571 — supported (TNB_2024_chunk_0014)
 >   - DEWA 2019 = 0.4818 — corpus-error (DEWA_2021_chunk_0448 / DEWA_2023_chunk_0247; GT says 0.4178)
@@ -53,7 +76,7 @@ TNB_2019_chunk_0094, TNB_2019_chunk_0134, TNB_2019_chunk_0152, TNB_2019_chunk_00
 >   - DEWA absolute reduction larger — supported
 >   - Both measures agree (DEWA > TNB) — supported
 > - notes: 
->   - faithful to retrieved text; wrong figures trace to corrupted DEWA/TNB chunks, not model.
+>   - correct — verdict matches GT; the two wrong 2019 endpoints are corpus-corrupted (0.57 for 0.56, 0.4818 for 0.4178), not model errors — see faithfulness.
 ---
 
 ## run 36 — Q1 · multi_step · 30B
@@ -94,9 +117,9 @@ TNB_2019_chunk_0094, TNB_2019_chunk_0134, TNB_2019_chunk_0152, TNB_2019_chunk_00
 
 **Cost/latency:** 38,885 tokens · 574.5s · $0.0042
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — ranking matches GT (DEWA larger on both, measures agree), but the same wrong endpoints as run 48: TNB 2019 = 0.57 (GT 0.56) and DEWA 2019 = 0.4818 (GT 0.4178), making the −0.0129/−0.0773 absolute and 2.26%/16.04% percentage figures incorrect vs GT.
-> - faithfulness (claims supported / total claims, e.g. 3/4): 5/6
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 3/5 — ranking right + TNB-2024 + DEWA-2024; TNB-2019 (0.57) and DEWA-2019 (0.4818) wrong
+> - faithfulness (claims supported / total claims, e.g. 3/4): 6/6
 >   - TNB 2019 = 0.57 — corpus-error (TNB_2019_chunk_0094 mislabels FY2018 as FY2019; clean 0.56 not retrieved here)
 >   - TNB 2024 = 0.5571 — supported (TNB_2024_chunk_0014)
 >   - DEWA 2019 = 0.4818 — corpus-error (DEWA_2023_chunk_0247; garbled table, GT says 0.4178)
@@ -104,7 +127,7 @@ TNB_2019_chunk_0094, TNB_2019_chunk_0134, TNB_2019_chunk_0152, TNB_2019_chunk_00
 >   - DEWA absolute reduction larger — supported
 >   - Both measures agree (DEWA > TNB) — supported
 > - notes: 
->   - faithful to retrieved text; wrong figures trace to corrupted DEWA/TNB chunks, not model.
+>   - correct — verdict matches GT; same corpus-corrupted 2019 endpoints as run 48.
 
 ---
 
@@ -196,15 +219,15 @@ TNB_2019_chunk_0215, DEWA_2019_chunk_0262, DEWA_2023_chunk_0247, DEWA_2022_chunk
 
 **Cost/latency:** 3,917 tokens · 13.7s · $0.0012
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — final conclusion matches GT (DEWA larger on both, measures agree) and TNB 2019 = 0.56 is right, but endpoints are inconsistent and off: used TNB 2022 (0.55) and DEWA 2023 (0.3979) instead of the 2024 figures GT requires, and DEWA 2019 = 0.4818 (GT 0.4178), so the magnitudes (0.01/0.0839; 1.79%/17.41%) diverge from GT.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 2/5 — ranking right + TNB-2019 (0.56); used 2022/2023 endpoints not 2024, DEWA-2019 (0.4818) wrong
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - TNB 2019 = 0.56 — supported (TNB_2019_chunk_0215)
 >   - TNB 2022 = 0.55 (used as "most recent") — supported (TNB_2022_chunk_0186)
 >   - DEWA 2019 elec-only = 0.4818 — corpus-error (DEWA_2023_chunk_0247, garbled)
 >   - DEWA 2023 elec-only = 0.3979 — supported (DEWA_2023_chunk_0247)
 > - notes: 
->   - floated a 0.4912 combined figure but self-corrected to elec-only; final answer faithful. Used TNB 2022 not 2024 (only 2022 retrieved) — methodological gap, scored under correctness.
+>   - correct — verdict matches GT; used stale 2022/2023 endpoints instead of 2024, and 0.4818 DEWA-2019 is corpus-corrupted.
 
 ---
 
@@ -246,15 +269,15 @@ TNB_2019_chunk_0215, DEWA_2019_chunk_0262, DEWA_2023_chunk_0247, DEWA_2022_chunk
 
 **Cost/latency:** 3,282 tokens · 21.1s · $0.0004
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — conclusion matches GT (DEWA larger on both, measures agree) with TNB 2019 = 0.56 correct, but like run 60 it mixes endpoints (TNB 2022 0.55, DEWA 2023 0.3979) rather than 2024 and starts DEWA at 0.4818 (GT 0.4178), so reductions/percentages don't match GT.
-> - faithfulness (claims supported / total claims, e.g. 3/4): 3/4
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 2/5 — ranking right + TNB-2019 (0.56); used 2022/2023 endpoints not 2024, DEWA-2019 (0.4818) wrong
+> - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - TNB 2019 = 0.56 — supported (TNB_2019_chunk_0215)
 >   - TNB 2022 = 0.55 (used as "most recent") — supported (TNB_2022_chunk_0186)
 >   - DEWA 2019 = 0.4818 — corpus-error (DEWA_2023_chunk_0247)
 >   - DEWA 2023 = 0.3979 — supported (DEWA_2023_chunk_0247)
 > - notes: 
->   - same as run 60 minus self-correction; used 2022 for TNB vs 2023 for DEWA — inconsistent endpoint, a correctness issue not faithfulness.
+>   - correct — verdict matches GT; stale 2022/2023 endpoints and corpus-corrupted 0.4818; no self-correction unlike run 60.
 
 ---
 
@@ -296,8 +319,8 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0421, T
 
 **Cost/latency:** 41,891 tokens · 73.9s · $0.0090
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — wrong conclusion: named TNB (its stated 5% target) as facing the steepest required reduction and said CenterPoint/DEWA couldn't be determined. GT is CenterPoint (~8.33%/yr, 2023→2035) vs TNB/DEWA ~3.85%/yr; the model never computed the required rates the question demands.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — wrong verdict (named TNB), none of the three required rates computed
 > - faithfulness (claims supported / total claims, e.g. 3/4): 5/5
 >   - TNB 5% annual reduction from 2024 — supported (TNB_2024_chunk_0421 / 0414)
 >   - TNB net-zero 2050 — supported (TNB_2024_chunk_0414)
@@ -305,7 +328,7 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0421, T
 >   - DEWA 2024 = 0.4045 — supported (DEWA_2024_chunk_0277)
 >   - DEWA net-zero 2050 — supported (DEWA_2024_chunk_0545)
 > - notes: 
->   - all claims grounded; correctness penalised separately for concluding TNB (GT: CenterPoint).
+>   - wrong — named TNB by treating its disclosed 5% target as a computed requirement; GT is CenterPoint (~8.33%/yr). Grounded, but never did the arithmetic the question needs.
 
 ---
 
@@ -347,8 +370,8 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0421, T
 
 **Cost/latency:** 42,532 tokens · 152.8s · $0.0046
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — wrong conclusion: declared TNB steepest based on its stated 5% target rather than computing required rates. GT is CenterPoint (~8.33%/yr to 2035) ahead of TNB and DEWA (~3.85%/yr each); the model conflated a disclosed target with the required reduction.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — wrong verdict (named TNB), no required rates computed
 > - faithfulness (claims supported / total claims, e.g. 3/4): 6/6
 >   - TNB 5% annual from 2024 — supported (TNB_2024_chunk_0421 / 0414)
 >   - TNB net-zero 2050 — supported (multiple TNB_2024)
@@ -357,7 +380,7 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0421, T
 >   - DEWA net-zero 2050 — supported (DEWA_2024_chunk_0545)
 >   - DEWA 30% by 2030 vs 2018 — supported (DEWA_2024_chunk_0273)
 > - notes: 
->   - fully grounded; wrong final conclusion (TNB) is a reasoning failure, not faithfulness.
+>   - wrong — same TNB error as run 49; no rates computed.
 
 ---
 
@@ -381,12 +404,12 @@ TNB_2024_chunk_0851, TNB_2023_chunk_0361, TNB_2024_chunk_0425, TNB_2024_chunk_01
 
 **Cost/latency:** 2,273 tokens · 2.8s · $0.0005
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — abstained ("Insufficient information to answer") when GT has a determinate answer (CenterPoint steepest, ~8.33%/yr). Per the scale a refusal where the data existed in GT scores incorrect; retrieval only surfaced TNB, but the run still failed to deliver the expected answer.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — abstained, no verdict and no rates
 > - faithfulness (claims supported / total claims, e.g. 3/4): 1/1
 >   - "Insufficient data to answer" — supported (only TNB target text retrieved, no intensity values)
 > - notes: 
->   - REFUSAL run — high faithfulness reflects that almost no claims were made, not strong grounding. Treat as abstention when comparing pipelines.
+>   - abstained — 'insufficient information'; the GT answer (CenterPoint steepest) exists. Almost no claims made, hence the high faithfulness.
 
 ---
 
@@ -417,14 +440,14 @@ TNB_2024_chunk_0851, TNB_2023_chunk_0361, TNB_2024_chunk_0425, TNB_2024_chunk_01
 
 **Cost/latency:** 2,478 tokens · 72.3s · $0.0003
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — abstained on the comparison (stated only TNB facts, then "insufficient information") when GT has a determinate answer (CenterPoint steepest, ~8.33%/yr). Refusal where the GT answer existed = incorrect.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — abstained, no verdict and no rates
 > - faithfulness (claims supported / total claims, e.g. 3/4): 3/3
 >   - TNB 35% by 2035 (base 2020) — supported (TNB_2024_chunk_0851)
 >   - TNB net-zero 2050 — supported (TNB_2024_chunk_0851)
 >   - TNB 5% annual from 2024 — supported (TNB_2024_chunk_0851 / 0421)
 > - notes: 
->   - REFUSAL on the actual comparison; only stated TNB facts then declined. Faithful but non-responsive.
+>   - abstained — stated TNB facts then declined; the GT answer exists.
 
 ---
 
@@ -453,15 +476,15 @@ TNB_2024_chunk_0851, TNB_2024_chunk_0853, TNB_2024_chunk_0425, DEWA_2020_chunk_0
 
 **Cost/latency:** 14,778 tokens · 70.0s · $0.0032
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — right top-line ("yes, intermediate targets") and got the 35%-by-2035 (FY2020 base) and 5%-annual-from-2024 targets, but incomplete vs GT: omitted the 50% coal-capacity cut by 2035 (a primary GT target), the ≤25% coal-revenue cap, and the 8.3GW-RE-by-2025 milestone.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 3/3 — yes + 35%-by-2035 (FY2020 base) + 5%-annual-from-2024
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - TNB net-zero 2050 — supported (TNB_2024_chunk_0851)
 >   - 5% annual from 2024 — supported (TNB_2024_chunk_0851 / 0425)
 >   - 35% by 2035 — supported (TNB_2024_chunk_0851 / 0425)
 >   - Base year FY2020 — supported (TNB_2024_chunk_0851)
 > - notes: 
->   - grounded but incomplete vs GT (missed coal-capacity, coal-revenue, 8.3GW) — correctness issue.
+>   - correct — captured both intermediate emissions-intensity targets; the coal-capacity/coal-revenue/RE items in GT are not emissions targets, so out of scope here.
 
 ---
 
@@ -492,15 +515,15 @@ TNB_2024_chunk_0425, TNB_2023_chunk_0361, TNB_2024_chunk_0851, TNB_2024_chunk_08
 
 **Cost/latency:** 12,434 tokens · 8.2s · $0.0014
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — correct top-line plus the 35%-by-2035 (FY2020 base) and 5%-annual-from-2024 targets, but like run 50 it misses GT's 50% coal-capacity cut by 2035, the ≤25% coal-revenue cap, and the 8.3GW-RE-by-2025 milestone.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 3/3 — yes + 35%-by-2035 (FY2020 base) + 5%-annual-from-2024
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - TNB net-zero 2050 — supported (TNB_2024_chunk_0425 / 0851)
 >   - 5% annual from FY2024 — supported (TNB_2024_chunk_0176 / 0421)
 >   - 35% by 2035 — supported (TNB_2024_chunk_0851 / 0421)
 >   - Base FY2020 — supported (TNB_2024_chunk_0851 / 0176)
 > - notes: 
->   - grounded; incomplete vs GT.
+>   - correct — both emissions-intensity targets captured.
 
 ---
 
@@ -533,15 +556,15 @@ TNB_2023_chunk_0361, TNB_2024_chunk_0421, TNB_2022_chunk_0185, TNB_2024_chunk_08
 
 **Cost/latency:** 2,792 tokens · 2.1s · $0.0007
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — most complete of the Q3 set (yes + 35% by 2035 vs FY2020, 5% annual from 2024, RE-by-2025, net-zero/coal-free 2050), but still incomplete: gives "coal-free by 2050" rather than GT's intermediate 50% coal-capacity cut by 2035, omits the ≤25% coal-revenue cap, and states RE target as "83 GW" (GT 8.3GW).
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 3/3 — yes + 35%-by-2035 + 5%-annual-from-2024
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - 83 GW RE by 2025 — supported (TNB_2024_chunk_0851)
 >   - 35% by 2035 vs 2020 — supported (TNB_2022_chunk_0185 / TNB_2024_chunk_0851)
 >   - 5% annual from 2024 — supported (TNB_2024_chunk_0851 / 0421)
 >   - net-zero + coal-free 2050 — supported (TNB_2022_chunk_0185 / TNB_2024_chunk_0851)
 > - notes: 
->   - "83 GW" is a corpus reading (true 8,300 MW = 8.3 GW) but matches retrieved chunk; most complete Q3 answer.
+>   - correct — both emissions targets captured; also mentioned RE-by-2025 but as '83 GW' (wrong magnitude), and that's a non-emissions target anyway.
 
 ---
 
@@ -567,14 +590,14 @@ TNB_2023_chunk_0361, TNB_2024_chunk_0421, TNB_2022_chunk_0185, TNB_2024_chunk_08
 
 **Cost/latency:** 2,640 tokens · 2.8s · $0.0003
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — correct top-line and the 35%-by-2035 (vs 2020) + 5%-annual-from-2024 targets, but the least complete Q3 answer: omits the 50% coal-capacity cut by 2035, the ≤25% coal-revenue cap, and the 8.3GW-RE-by-2025 milestone in GT.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 3/3 — yes + 35%-by-2035 + 5%-annual-from-2024
 > - faithfulness (claims supported / total claims, e.g. 3/4): 3/3
 >   - 35% by 2035 vs 2020 — supported (TNB_2022_chunk_0185 / TNB_2024_chunk_0851)
 >   - 5% annual from 2024 — supported (TNB_2024_chunk_0421)
 >   - net-zero 2050 — supported (TNB_2024_chunk_0851)
 > - notes: 
->   - grounded; least complete Q3 answer.
+>   - correct — both emissions targets captured; least surrounding detail of the Q3 set.
 
 ---
 
@@ -617,15 +640,15 @@ DEWA_2021_chunk_0448, DEWA_2021_chunk_0444, DEWA_2023_chunk_0247, DEWA_2023_chun
 
 **Cost/latency:** 66,213 tokens · 947.7s · $0.0142
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — gets the "not consistent" conclusion GT requires (though only flags the 2021 uptick, missing GT's 2016 and 2024 reversals), but the net-reduction figure is wrong: −0.1335/−24.81% computed off a 2010 = 0.538 graph value, vs GT 0.4700→0.4045 = −0.0655/−13.9%.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 2/4 — 'not consistent' + overall-improved; net figure wrong (-24.81%), only flagged 2021
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - DEWA 2020→2021 rise (0.4041→0.4293) — supported (DEWA_2021_chunk_0448)
 >   - DEWA 2010 = 0.538 (graph) — supported (DEWA_2016_chunk_0204)
 >   - DEWA 2024 = 0.4045 — supported (DEWA_2024_chunk_0277)
 >   - "Not consistent since 2010" — supported (2021 uptick in DEWA_2021_chunk_0448 is sufficient evidence)
 > - notes: 
->   - net reduction figure (−24.81%) is arithmetic off the 0.538 graph value, so wrong vs GT −13.9% — a correctness issue. Most complete Q4 answer.
+>   - correct verdict (not consistent); net reduction wrong (-24.81% off a 0.538 base vs GT -13.9% off 0.4700) and caught only 1 of 3 reversal years.
 
 ---
 
@@ -683,15 +706,15 @@ DEWA_2021_chunk_0448, DEWA_2021_chunk_0444, DEWA_2023_chunk_0247, DEWA_2023_chun
 
 **Cost/latency:** 183,954 tokens · 480.9s · $0.0195
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — "not consistent" conclusion is right and it catches two reversals (2021 and 2024), but it declines the net-reduction figure the question explicitly asks for (citing 2010 uncertainty), so the answer is incomplete vs GT's −0.0655/−13.9%.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 2/4 — 'not consistent' + overall-improved; declined net figure, caught 2 of 3 reversals
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - DEWA 2020→2021 rise — supported (DEWA_2021_chunk_0448 / 0452)
 >   - DEWA 2023→2024 rise (0.3979→0.4045) — supported (DEWA_2023_chunk_0247 + DEWA_2024_chunk_0277)
 >   - DEWA 2010 = 0.538 (graph, flagged uncertain) — supported (DEWA_2016_chunk_0204)
 >   - DEWA 2024 = 0.4045 — supported (DEWA_2024_chunk_0277)
 > - notes: 
->   - caught BOTH reversals; appropriately declined the net-reduction calc citing graph uncertainty. Strongest faithfulness behaviour of the Q4 set.
+>   - correct verdict; declined the net figure citing graph uncertainty, caught 2021 + 2024 (missed 2016).
 ---
 
 ## run 63 — Q4 · single_shot · 235B
@@ -727,15 +750,15 @@ DEWA_2024_chunk_0273, DEWA_2021_chunk_0448, DEWA_2023_chunk_0243, DEWA_2023_chun
 
 **Cost/latency:** 3,687 tokens · 4.6s · $0.0009
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — refused both parts ("cannot be answered," 2024 missing), so it delivers neither the consistency judgment nor the net reduction that GT provides (improved-but-not-consistent; −0.0655/−13.9%). Abstention where the GT answer existed = incorrect.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — abstained on both parts
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - DEWA 2010 = 0.538 — supported (DEWA_2016_chunk_0204)
 >   - DEWA 2019/2020/2021 = 0.4818/0.4744/0.4293 — supported (DEWA_2021_chunk_0448)
 >   - DEWA 2022/2023 = 0.4035/0.3979 — supported (DEWA_2022_chunk_0262 / DEWA_2023_chunk_0247)
 >   - 2024 not retrieved — supported (no DEWA_2024 chunk in this run)
 > - notes: 
->   - faithful; declined net reduction due to missing 2024 — a retrieval gap, scored under correctness.
+>   - abstained — refused both parts (2024 value missing); GT reaches improved-but-not-consistent, -13.9%.
 
 ---
 
@@ -769,14 +792,14 @@ DEWA_2024_chunk_0273, DEWA_2021_chunk_0448, DEWA_2023_chunk_0243, DEWA_2023_chun
 
 **Cost/latency:** 3,580 tokens · 3.7s · $0.0004
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — states DEWA "improved consistently since 2010," directly contradicting GT (improvement was NOT consistent; 2016/2021/2024 saw upticks). Wrong conclusion on the central question; also did not deliver the GT net reduction (−0.0655/−13.9%).
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 1/4 — only overall-improved direction right; wrong on consistency
 > - faithfulness (claims supported / total claims, e.g. 3/4): 2/3
 >   - DEWA 2010 = 0.538 — supported (DEWA_2016_chunk_0204)
 >   - DEWA 2023 = 0.3979 — supported (DEWA_2023_chunk_0247)
 >   - "DEWA improved CONSISTENTLY since 2010" — UNSUPPORTED (its own retrieved DEWA_2021_chunk_0448 shows the 2021 reversal; model ignored evidence it held)
 > - notes: 
->   - FLAGSHIP MODEL failure (not corpus) — contradicted its own retrieved chunk. Best inspectability example for the report.
+>   - wrong — claimed DEWA 'improved consistently,' contradicting its own retrieved chunk showing the 2021 reversal. Flagship-model failure, not corpus.
 ---
 
 ## run 52 — Q5 · multi_step · 235B
@@ -818,8 +841,8 @@ Centerpoint_2020_chunk_0016, Centerpoint_2020_chunk_0010, DEWA_2020_chunk_0320, 
 
 **Cost/latency:** 37,891 tokens · 132.1s · $0.0086
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — correctly captures TNB's change (no formal targets in 2020 → formalised 35%-by-2035 / coal / net-zero suite by 2023/24), matching GT's TNB narrative, but only 1 of 3 companies: honestly abstains on DEWA (16%→30% per GT) and CenterPoint (directional → net-zero-2035 per GT), so the answer is incomplete.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 1/4 — TNB change only; no cross-company thesis, DEWA and CenterPoint declined
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/6
 >   - CenterPoint 2020: 70% by 2035, 20-30% by 2040 — supported (Centerpoint_2020_chunk_0016)
 >   - DEWA 2020: ERP, 2010 baseline, no explicit % in retrieved 2020 chunks — supported (DEWA_2020_chunk_0319 / 0320)
@@ -828,7 +851,7 @@ Centerpoint_2020_chunk_0016, Centerpoint_2020_chunk_0010, DEWA_2020_chunk_0320, 
 >   - TNB 2020 "looking into setting targets" quote — unsupported (no TNB_2020 chunk with that text retrieved)
 >   - TNB 2024 "reaffirmed" — unsupported (no explicit reaffirmation language in retrieved TNB_2024 chunks)
 > - notes: 
->   - best Q5 answer — got TNB fully, honestly hedged CenterPoint/DEWA; two assertions about absent text drop it to 4/6.
+>   - abstained on the thesis — got TNB (no targets -> formalised), honestly declined DEWA and CenterPoint. Best Q5 answer.
 
 ---
 
@@ -873,9 +896,9 @@ Centerpoint_2020_chunk_0016, Centerpoint_2020_chunk_0010, DEWA_2020_chunk_0320, 
 
 **Cost/latency:** 53,392 tokens · 226.7s · $0.0060
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): partial — addresses two of three companies in GT's direction (TNB no-target→formalised; DEWA updated to 30% by 2030) but with errors: TNB's 2024 target is rendered as an impossible "345%" (corpus garble it failed to reconcile against the clean 35% it also held), DEWA's framing as a "recalibration downward" is off, and CenterPoint is abstained. Mixed right/wrong → partial.
-> - faithfulness (claims supported / total claims, e.g. 3/4): 5/7
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 1/4 — TNB direction right; DEWA framed as weakening, CenterPoint declined
+> - faithfulness (claims supported / total claims, e.g. 3/4): 6/7
 >   - CenterPoint 2020: 70%/20-30% — supported (Centerpoint_2020_chunk_0016)
 >   - DEWA 2020: 35% by 2030 vs BAU (2010 base) — supported (DEWA_2021_chunk_0445)
 >   - DEWA 2024: 30% by 2030 vs 2018 — supported (DEWA_2024_chunk_0273)
@@ -884,7 +907,7 @@ Centerpoint_2020_chunk_0016, Centerpoint_2020_chunk_0010, DEWA_2020_chunk_0320, 
 >   - TNB 2020 "no quantified target" — unsupported (asserted from absence)
 >   - CenterPoint 2023/24 "no targets found" — supported (no CenterPoint target chunks in those steps)
 > - notes: 
->   - 345% is corpus corruption BUT clean 35% was also in hand — model failed to reconcile. Corpus error + reasoning lapse.
+>   - wrong — TNB direction right despite the '345%' garble, but framed DEWA as weakening (35%->30%), inverting GT's 'strengthened'; CenterPoint abstained.
 
 ---
 
@@ -925,16 +948,16 @@ Centerpoint_2020_chunk_0016, TNB_2023_chunk_0361, TNB_2024_chunk_0017, TNB_2024_
 
 **Cost/latency:** 3,688 tokens · 5.9s · $0.0010
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — fails to identify the strengthening GT describes: concludes CenterPoint "no change," TNB targets "consistent 2023→2024" (never comparing to 2020), and DEWA "insufficient." GT says all three formalised/strengthened (DEWA 16%→30%, TNB formulating→formalised suite, CenterPoint directional→net-zero-2035), so the central comparison is wrong/abstained across the board.
-> - faithfulness (claims supported / total claims, e.g. 3/4): 3/5
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — 'no change / consistent' across the board
+> - faithfulness (claims supported / total claims, e.g. 3/4): 4/5
 >   - CenterPoint 2020: 70%/20-30% (2005 base) — supported (Centerpoint_2020_chunk_0016)
 >   - TNB 2023: "50% Scope 1 reduction by 2035" — corpus-error (TNB_2023_chunk_0361 garbled; clean 35% intensity present, model conflated with 50% coal-capacity figure)
 >   - TNB 2024: "50% reduction" — corpus-error (TNB_2024_chunk_0466 garbled table; clean 35% present)
 >   - DEWA: no target info — supported (only station/infra tables retrieved)
 >   - TNB "no new targets 2024 vs 2023" — unsupported (insufficient comparison data retrieved)
 > - notes: 
->   - two corpus-driven 50% errors from garbled tables; clean 35% was in the same chunks.
+>   - wrong — concluded no change / consistent, missing GT's strengthening; TNB figures garbled to 50%.
 
 ---
 
@@ -965,16 +988,16 @@ Centerpoint_2020_chunk_0016, TNB_2023_chunk_0361, TNB_2024_chunk_0017, TNB_2024_
 
 **Cost/latency:** 3,670 tokens · 3.9s · $0.0005
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — same failure as run 64 plus more garbled figures: CenterPoint "no change," TNB "consistent" (with corrupt 50%/25%/83GW values), DEWA "not mentioned." Misses GT's finding that all three strengthened/formalised targets; central comparison wrong or abstained.
-> - faithfulness (claims supported / total claims, e.g. 3/4): 2/5
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — 'no change / consistent' across the board
+> - faithfulness (claims supported / total claims, e.g. 3/4): 5/5
 >   - CenterPoint 2020: 70%/20-30% — supported (Centerpoint_2020_chunk_0016)
 >   - TNB 2023: "50% intensity reduction by 2035" — corpus-error (TNB_2023_chunk_0361 garbled "50 of"; clean 35%)
 >   - TNB 2024: "25% annual Scope 1 reduction" — corpus-error (TNB_2024_chunk_0466 garbled; clean annual rate is 5%)
 >   - "coal capacity ≤ 83 GW by 2025" — corpus-error (chunk shows garbled "8 3 G W"; true 8,300 MW = 8.3 GW)
 >   - DEWA: no targets — supported (only station data retrieved)
 > - notes: 
->   - worst faithfulness of set — three separate garbled-table misreads. All corpus, not hallucination.
+>   - wrong — same as run 64; most corpus-damaged run (50%/25%/83GW garbles) but all faithful to those chunks — a clean 'faithful to bad data' case.
 
 ---
 
@@ -1042,9 +1065,9 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0176, T
 
 **Cost/latency:** 94,109 tokens · 606.0s · $0.0204
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — concludes "TNB credible" by treating its 5% stated target as achieved trajectory (vs the 3.33% it computed), the opposite of GT, which finds TNB's actual pace ~0.57%/yr and none of the three credible. CenterPoint and DEWA are left "cannot assess." Wrong conclusion on the question's core.
-> - faithfulness (claims supported / total claims, e.g. 3/4): 5/6
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — wrong verdict (TNB credible), other two not assessed
+> - faithfulness (claims supported / total claims, e.g. 3/4): 6/6
 >   - CenterPoint net-zero 2035 — supported (Centerpoint_2023_chunk_0234)
 >   - DEWA net-zero 2050 — supported (DEWA_2024_chunk_0273)
 >   - DEWA 2024 = 0.4045 — supported (DEWA_2024_chunk_0277)
@@ -1052,7 +1075,7 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0176, T
 >   - TNB 5% annual target (vs 3.33% required) — supported (TNB_2024_chunk_0421)
 >   - TNB FY2020 intensity not disclosed — supported (no TNB_2020 intensity chunk)
 > - notes: 
->   - faithful to retrieved text, BUT correctness fails hard — concluded "TNB credible" by treating the 5% TARGET as achieved trajectory (GT: TNB actual 0.57%/yr, not credible). Faithful-but-wrong-reasoning.
+>   - wrong — concluded 'TNB credible' by reading the 5% target as achieved trajectory; GT finds none of the three credible.
 
 ---
 
@@ -1114,8 +1137,8 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0176, T
 
 **Cost/latency:** 90,045 tokens · 371.6s · $0.0098
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — declines to assess credibility for all three companies (citing missing base-year intensities), delivering no verdict. GT reaches a determinate answer (none credible; actual reductions <1.1%/yr vs 3.85–8.33% required), so a blanket abstention where the GT answer existed = incorrect.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — abstained, no credibility verdict for any company
 > - faithfulness (claims supported / total claims, e.g. 3/4): 5/6
 >   - CenterPoint net-zero 2035 — supported (Centerpoint_2024_chunk_0224)
 >   - TNB net-zero 2050 — supported (TNB_2024_chunk_0414)
@@ -1124,7 +1147,7 @@ Centerpoint_2024_chunk_0264, Centerpoint_2023_chunk_0278, TNB_2024_chunk_0176, T
 >   - TNB 35% by 2035 from FY2020 — supported (TNB_2024_chunk_0176)
 >   - DEWA base year "2010 or 2012" — unsupported (2010 appears for ERP; 2012 nowhere in retrieved chunks)
 > - notes: 
->   - more trustworthy than run 53 — declined to declare credibility rather than over-claiming. Honest non-answer.
+>   - abstained — declined a verdict for all three (missing base-year intensities); more honest than run 53's over-claim.
 
 ---
 
@@ -1187,15 +1210,15 @@ TNB_2024_chunk_0851, TNB_2023_chunk_0361, TNB_2024_chunk_0176, TNB_2022_chunk_03
 
 **Cost/latency:** 3,312 tokens · 8.9s · $0.0011
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — TNB-only (no CenterPoint/DEWA retrieved) and the answer is truncated mid-sentence ("However, actual…") before reaching any credibility verdict, so it delivers none of GT's three-company determination (none credible). No usable conclusion.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — abstained, truncated before any verdict
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - TNB base year 2020 — supported (TNB_2024_chunk_0851)
 >   - TNB net-zero 2050 — supported (TNB_2024_chunk_0851 / TNB_2021_chunk_0234)
 >   - TNB 35% by 2035 — supported (TNB_2022_chunk_0185 / TNB_2024_chunk_0425)
 >   - TNB 5% annual from 2024 — supported (TNB_2024_chunk_0414)
 > - notes: 
->   - "2020/2024 intensity absent" is correct for this run's retrieved set, so supported. Answer truncated mid-sentence ("However, actual") — generation cut off; correctness incomplete.
+>   - abstained — TNB-only, truncated mid-sentence before any credibility verdict.
 
 ---
 
@@ -1241,46 +1264,61 @@ TNB_2024_chunk_0851, TNB_2023_chunk_0361, TNB_2024_chunk_0176, TNB_2022_chunk_03
 
 **Cost/latency:** 2,734 tokens · 201.3s · $0.0004
 
-> **My scores for this run:**
-> - correctness (correct / partial / incorrect): incorrect — refuses outright ("insufficient information to answer for any company"), TNB-only retrieval, no credibility verdict. GT reaches a determinate answer (none credible), so the abstention scores incorrect.
+> **Our scores for this run:**
+> - correctness (GT claims matched, k/n): 0/4 — abstained for all companies
 > - faithfulness (claims supported / total claims, e.g. 3/4): 4/4
 >   - TNB net-zero 2050, base FY2020 — supported (TNB_2024_chunk_0851)
 >   - TNB 35% by 2035 — supported (TNB_2024_chunk_0851)
 >   - TNB 5% annual from 2024 — supported (TNB_2024_chunk_0851 / 0414)
 >   - actual reduction uncomputable (data missing) — supported (no FY2020 intensity)
 > - notes: 
->   - REFUSAL on the comparison; faithful but non-responsive — same abstention pattern as runs 61/55.
-That's all 24 in worksheet order. Paste each block under its matching run, fill the correctness
+>   - abstained — refused for all companies; GT reaches none-credible.
 
 ---
 
-## ANSWERS TABLE (fill this in — Phase 3 reads this)
+## ANSWERS TABLE (Phase 3 reads this)
 
-Copy your scores here once you've read every run above.
+correctness = GT key claims matched (k/n) · faithfulness = supported+corpus-error / total (corpus-error counts as supported) · verdict tag (correct/wrong/abstained) is in the notes
 
 | run_id | Q | pipeline | model | correctness | faithfulness | notes |
 |---|---|---|---|---|---|---|
-| 48 | Q1 | multi_step | 235B |  |  |  |
-| 36 | Q1 | multi_step | 30B |  |  |  |
-| 60 | Q1 | single_shot | 235B |  |  |  |
-| 54 | Q1 | single_shot | 30B |  |  |  |
-| 49 | Q2 | multi_step | 235B |  |  |  |
-| 37 | Q2 | multi_step | 30B |  |  |  |
-| 61 | Q2 | single_shot | 235B |  |  |  |
-| 55 | Q2 | single_shot | 30B |  |  |  |
-| 50 | Q3 | multi_step | 235B |  |  |  |
-| 38 | Q3 | multi_step | 30B |  |  |  |
-| 62 | Q3 | single_shot | 235B |  |  |  |
-| 56 | Q3 | single_shot | 30B |  |  |  |
-| 51 | Q4 | multi_step | 235B |  |  |  |
-| 39 | Q4 | multi_step | 30B |  |  |  |
-| 63 | Q4 | single_shot | 235B |  |  |  |
-| 57 | Q4 | single_shot | 30B |  |  |  |
-| 52 | Q5 | multi_step | 235B |  |  |  |
-| 40 | Q5 | multi_step | 30B |  |  |  |
-| 64 | Q5 | single_shot | 235B |  |  |  |
-| 58 | Q5 | single_shot | 30B |  |  |  |
-| 53 | Q6 | multi_step | 235B |  |  |  |
-| 41 | Q6 | multi_step | 30B |  |  |  |
-| 65 | Q6 | single_shot | 235B |  |  |  |
-| 59 | Q6 | single_shot | 30B |  |  |  |
+| 48 | Q1 | multi_step | 235B | 3/5 | 6/6 | correct verdict; 2019 endpoints corpus-corrupted (0.57, 0.4818) |
+| 36 | Q1 | multi_step | 30B | 3/5 | 6/6 | correct verdict; same corpus-corrupted endpoints as 48 |
+| 60 | Q1 | single_shot | 235B | 2/5 | 4/4 | correct verdict; used 2022/2023 endpoints, not 2024 |
+| 54 | Q1 | single_shot | 30B | 2/5 | 4/4 | correct verdict; as 60, no self-correction |
+| 49 | Q2 | multi_step | 235B | 0/4 | 5/5 | wrong (TNB; GT CenterPoint); no rates computed |
+| 37 | Q2 | multi_step | 30B | 0/4 | 6/6 | wrong (TNB); no rates computed |
+| 61 | Q2 | single_shot | 235B | 0/4 | 1/1 | abstained; near-zero claims |
+| 55 | Q2 | single_shot | 30B | 0/4 | 3/3 | abstained after stating TNB facts |
+| 50 | Q3 | multi_step | 235B | 3/3 | 4/4 | correct; both emissions targets (coal/RE out of scope) |
+| 38 | Q3 | multi_step | 30B | 3/3 | 4/4 | correct; both emissions targets |
+| 62 | Q3 | single_shot | 235B | 3/3 | 4/4 | correct; RE mentioned as 83GW (out of scope anyway) |
+| 56 | Q3 | single_shot | 30B | 3/3 | 3/3 | correct; least surrounding detail |
+| 51 | Q4 | multi_step | 235B | 2/4 | 4/4 | correct verdict; net figure wrong, caught 1 of 3 reversals |
+| 39 | Q4 | multi_step | 30B | 2/4 | 4/4 | correct verdict; declined net figure, caught 2 of 3 reversals |
+| 63 | Q4 | single_shot | 235B | 0/4 | 4/4 | abstained on both parts (2024 missing) |
+| 57 | Q4 | single_shot | 30B | 1/4 | 2/3 | wrong (claimed 'consistent'); contradicts own chunk |
+| 52 | Q5 | multi_step | 235B | 1/4 | 4/6 | abstained on thesis; got TNB, hedged the rest |
+| 40 | Q5 | multi_step | 30B | 1/4 | 6/7 | wrong; TNB ok (345% garble), DEWA framed as weakening |
+| 64 | Q5 | single_shot | 235B | 0/4 | 4/5 | wrong ('no change'); TNB 50% garbles |
+| 58 | Q5 | single_shot | 30B | 0/4 | 5/5 | wrong; most corpus-damaged, all faithful |
+| 53 | Q6 | multi_step | 235B | 0/4 | 6/6 | wrong ('TNB credible'); GT none credible |
+| 41 | Q6 | multi_step | 30B | 0/4 | 5/6 | abstained; honest non-answer |
+| 65 | Q6 | single_shot | 235B | 0/4 | 4/4 | abstained; truncated before verdict |
+| 59 | Q6 | single_shot | 30B | 0/4 | 4/4 | abstained for all companies |
+
+### Summary (aggregate)
+
+Verdict counts across the 24 runs:
+
+| split | correct | wrong | abstained |
+|---|---|---|---|
+| all | 10 | 7 | 7 |
+| multi_step | 6 | 4 | 2 |
+| single_shot | 4 | 3 | 5 |
+| 235B | 5 | 3 | 4 |
+| 30B | 5 | 4 | 3 |
+
+Reading: multi_step reaches a correct verdict more often and abstains least; single_shot abstains most, consistent with under-retrieval — the clearest pipeline difference. Model size barely moves the verdict split.
+
+Faithfulness is uniformly high (19 of 24 runs at 100%, lowest 67%), so where correctness collapses the cause is corpus corruption or reasoning, not hallucination. We do not average correctness across questions — the denominators differ by question (3–5), so it is read per question (e.g. Q2 and Q6 are 0 because no run did the required-rate arithmetic the question asks for; Q3 is full marks on the in-scope targets).

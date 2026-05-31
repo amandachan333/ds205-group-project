@@ -365,10 +365,10 @@ def insert_evaluation(
     evaluator_notes: str | None = None,
 ) -> int:
     """
-    Record a manual evaluation score for a run's final answer.
-    correctness must be one of: 'correct', 'partial', 'incorrect'.
+    Correctness is a within-question key-claim match fraction e.g. '3/5'.
+    The denominator is fixed per question, so fractions are comparable across
+    the four cells of one question but not averaged across different questions.
     faithfulness_score is a string fraction e.g. '3/4' or a decimal '0.75'.
-    Returns the auto-assigned eval_id.
     """
     cursor = conn.execute(
         """
