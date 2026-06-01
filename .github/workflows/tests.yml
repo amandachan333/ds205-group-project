@@ -1,10 +1,10 @@
 name: Tests
 
 # Run on every push to main AND on every PR opened against main.
-# PR runs are the more important one — they catch breakage before it lands.
+# PR runs are the more important one — they catch breakage *before* it lands.
 on:
   push:
-    branches: [main]git 
+    branches: [main]
   pull_request:
     branches: [main]
 
