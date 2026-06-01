@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 
@@ -15,41 +14,6 @@ def bootstrap_runtime_env():
     KMP_DUPLICATE_LIB_OK are visible when those libraries initialise.
     """
     load_dotenv()
-
-
-def resolve_pdf_workflow_config():
-    """Read PDF workflow settings from environment variables and return them
-    as a plain dict.
-
-    Expected env vars (all optional with sensible defaults):
-      PDF_DIR   - directory that contains the PDF(s)  [default: data/raw]
-      PDF_GLOB  - filename pattern inside PDF_DIR     [default: *.pdf]
-      HF_HOME   - HuggingFace model cache directory
-      KMP_DUPLICATE_LIB_OK - Windows OpenMP workaround flag
-
-    Returns a dict with keys:
-      pdf_dir, pdf_glob, pdf_candidates, pdf_path, hf_home, kmp
-
-    Raises FileNotFoundError if no PDFs match the pattern.
-    """
-    pdf_dir = Path(os.environ.get("PDF_DIR", "data/raw"))
-    pdf_glob = os.environ.get("PDF_GLOB", "**/*.pdf")
-    pdf_candidates = sorted(pdf_dir.glob(pdf_glob))
-
-    if not pdf_candidates:
-        raise FileNotFoundError(
-            f"No PDFs found in '{pdf_dir}' matching '{pdf_glob}'. "
-            "Check PDF_DIR and PDF_GLOB in your .env file."
-        )
-
-    return {
-        "pdf_dir": pdf_dir,
-        "pdf_glob": pdf_glob,
-        "pdf_candidates": pdf_candidates,
-        "pdf_path": pdf_candidates[0],
-        "hf_home": os.environ.get("HF_HOME"),
-        "kmp": os.environ.get("KMP_DUPLICATE_LIB_OK"),
-    }
 
 
 def ensure_stage_dirs(*dirs: Path) -> None:

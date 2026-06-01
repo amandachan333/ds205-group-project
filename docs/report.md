@@ -1,16 +1,8 @@
 # Project C - Benchmark Report: Single-shot vs Multi-step RAG for Carbon Performance
 
-> **How to use this file.** This is the argument layer. Each Results subsection cites a figure or number the analysis notebook (`analysis.ipynb`) already produces - point to it, don't recompute. Sections marked **[FILL]** are still to be written; **[TO SUPPLY]** marks a specific datum that isn't yet in any source file. The evaluation framework (Section 2.4) is being written separately.
-
----
-
 ## 1. Summary
 
-**[FILL - write last.]** One short paragraph: the headline finding and the one-sentence recommendation to Sylvan, before any evidence. Everything below justifies it.
-
-Spine to use (from the 2x2 design): does multi-step decomposition improve answer quality and/or trustworthiness over single-shot, and is the extra cost justified for TPI - including whether multi-step on the 30B beats single-shot on the 235B (decomposition as a substitute for model scale).
-
----
+Multi-step query decomposition weakly dominates single-shot on correctness for Carbon Performance questions — better on the synthesis questions (Q1, Q4, Q5), never worse anywhere — but the modest accuracy gain is not the main finding. Decomposition's real effect is behavioural: it converts abstentions into committed answers (single-shot abstained on 5 of 12 runs, multi-step on 2), and because every sub-step is persisted, those commitments are auditable in a way single-shot's single-call output is not. Faithfulness is high and near-identical across both pipelines (~94%), so the difference is not hallucination; where answers are numerically wrong, the cause is almost always corrupted retrieved text from PDF extraction, not model invention. These gains come at roughly an order-of-magnitude cost: multi-step runs ~14x more expensive, ~12–13x slower, and uses ~19x the tokens. Model size barely moved results — pipeline choice mattered more than scaling from 30B to 235B, so multi-step@30B is a more sensible investment than single-shot@235B for these question types. Recommendation: adopt multi-step decomposition selectively, for complex high-stakes questions where auditability justifies the cost, and keep single-shot for simple lookups.
 
 ## 2. Methodology
 
@@ -42,20 +34,21 @@ Note: Q3 lists targets with no intensity time-series; Q6 is a trajectory-credibi
 
 ### 2.2 The two pipelines
 
-**[FILL - brief description only; full architecture lives in README/DECISIONS.]** Cover, in a few sentences each:
-
-- **Shared stack** (held constant across all four conditions): BM25-hybrid retrieval (semantic + keyword merged), fixed-size character chunking, `Qwen3-Embedding-8B` embeddings via NEBIUS, local `ms-marco-MiniLM-L-6-v2` cross-encoder rerank, ChromaDB vector store, SQLite for intermediate persistence.
-- **Single-shot baseline:** retrieve top-K -> one prompt -> one answer.
-- **Multi-step:** Least-to-Most decomposition -> per-sub-question retrieval + generation -> intermediate results persisted to SQLite -> assembly call reads from the DB -> final answer.
-- **2x2 design:** pipeline type x model size (Qwen3-30B-A3B, Qwen3-235B-A22B). State the three comparison questions the design answers (decomposition effect, model-size effect, and whether multi-step@30B beats single-shot@235B).
+Both pipelines share their data preparation and retrieval stack so that the only experimental variables are pipeline structure and model size. The shared components are: PDF text and table extraction via `unstructured` hi_res for text elements and Gemini Vision (`gemini-2.5-flash`) for table pages; sentence-window chunking with table-aware splitting (table chunks, identified by pipe characters from Gemini's markdown output, are kept intact regardless of length); embedding via NEBIUS-hosted `Qwen3-Embedding-8B` (4096-dimension vectors); a SQLite + sqlite-vec vector store at `data/vector_store.db`; and SQLite at `db/benchmark.db` for intermediate persistence across `questions`, `runs`, `decompositions`, `steps`, `final_answers`, and `evaluations` tables. Retrieval is hybrid BM25 + dense via Reciprocal Rank Fusion (k = 60, BM25 weight = 2) with a top-N = 40 candidate pool refined to 10 context chunks by a three-pass value-aware selection step. Architectural rationale is in `DECISIONS.md`; module-level detail and known limitations are in `CONTRIBUTING.md`.
+ 
+**Single-shot baseline.** One retrieval pass and one generation call per question. The retrieved chunks and the model's answer are persisted as a single `steps` row at `step_index = 1`, giving every benchmark run — single-shot or multi-step — the same shape in the SQLite store.
+ 
+**Multi-step pipeline.** Three phases. Phase 1 prompts the generation model with the question and a corpus inventory listing available report years per company; the model returns an ordered list of sub-questions, which are written to the `decompositions` table and to N `steps` rows in pending state. Phase 2 iterates over the pending steps: for each, it loads completed-step answers as established-facts context, runs hybrid retrieval against the sub-question, generates the sub-answer, and writes the step row to complete before advancing. Phase 3 reads all completed step answers and issues a single assembly call (max 2048 tokens) that synthesises a final answer. Every intermediate result is persisted to SQLite before the next phase begins, which is what makes the run resumable across process interruptions and the failure mode auditable (Section 3.3).
+ 
+**2 × 2 design.** Pipeline type (single-shot vs multi-step) × generation model size (`Qwen3-30B-A3B-Instruct-2507` vs `Qwen3-235B-A22B-Instruct-2507`), evaluated on the same six questions for 24 runs total. The design answers three questions: does decomposition improve answer quality at a fixed model size; does scaling model size improve answer quality at a fixed pipeline; and does multi-step on the 30B beat single-shot on the 235B — i.e., can decomposition substitute for model scale at lower cost?
 
 ### 2.3 Decomposition design & justification
 
-**[FILL - the brief's "core engineering challenge"; must be argued, not just described.]** Source: `decomposition_research.md`.
-
-- **Choice:** Least-to-Most (LtM). Justify on: clean two-phase mapping onto the SQLite schema (one decomposition record, one per sub-step, one assembly record), predictable N+1 call count (budget-safe vs Self-Ask/ReAct's variable calls), natural fit with trajectory/change-over-time ordering, and the fixed question set neutralising LtM's main weakness (sub-questions planned without seeing documents can be reviewed before spending tokens).
-- **Alternatives reviewed:** CoT, Self-Ask, ReAct - summarise the comparison table and why each was set aside; ReAct retained as a stretch goal.
-- **Granularity trade-off (the brief's specific demand - do not skip):** address that decomposition must not be *so granular that assembly reintroduces the failure mode*. Use the live evidence: Run 39 split Q4 into **31 sub-questions** (184k tokens, the most expensive run). Discuss how sub-question count was chosen and the cost/inspectability trade-off it implies.
+The multi-step pipeline uses **Least-to-Most (LtM) prompting** (Zhou et al., ICLR 2023): a single decomposition call breaks the input question into an ordered list of sub-questions, then each is answered in sequence with prior sub-answers as context. The choice was made before any pipeline code was written; the full review of alternatives is in `decomposition_research.md`. The argument matters here for two reasons: it explains why the persistence schema looks the way it does (Section 2.2), and the granularity it produced is what gives Section 3.4's expensive Run 39 its meaning.
+ 
+**Why LtM.** Its two-phase structure maps cleanly onto the SQLite schema — one `decompositions` row, N `steps` rows, one `final_answers` row, each corresponding to one LLM call — which is what makes per-step inspectability possible. The call count is deterministic at N + 1, so cost is bounded in advance against the $100 NEBIUS budget. The ordering matches the trajectory and change-over-time questions directly (extract year-N → extract year-(N+1) → assess trend). LtM's main weakness is that decomposition is planned before seeing the documents, but since the benchmark set is fixed and known, the LLM-generated decompositions can be reviewed via the `--review` flag before any tokens are spent on sub-question execution. **ReAct** was the strongest alternative — most adaptive, naturally inspectable — and is retained as a stretch goal (Section 7.3); we deferred it on grounds of implementation complexity and variable call counts that fit poorly with a fixed budget. Self-Ask was rejected for the same predictability concern without ReAct's flexibility upside. CoT is not strictly a decomposition strategy and describes what the single-shot baseline already does.
+ 
+**Granularity.** The brief flags a real risk: decomposition can produce sub-questions so atomic that assembly re-introduces the failure mode it was meant to break apart. We did not cap sub-question count; the model determined it dynamically. The upper end of what this produced is **Run 39 (Q4, multi-step, 30B)**, which decomposed the question into **31 sub-questions** — one per year from 2010 to 2024 plus year-pair checks plus two synthesis steps — and consumed **183,954 tokens**, roughly five times the multi-step average. The run completed within budget and produced an answer at Q4's multi-step correctness ceiling of 0.50 (Section 3.1) — the same ceiling a more conservative decomposition would plausibly have hit given how few year sub-questions had retrievable data. The 31-fold granularity bought a more complete audit trail (every year-pair check is independently inspectable in the step log) at five times the token cost for no measured accuracy gain. We kept the dynamic decomposition uncapped because the principled way to constrain granularity is to shape the decomposition prompt with worked examples, not to enforce a numeric ceiling.
 
 ### 2.4 Evaluation framework
 
@@ -79,7 +72,6 @@ Corpus-error claims count as **supported** for the faithfulness score, because t
 
 **Provenance.** Correctness and faithfulness were scored against the frozen ground-truth set by a single evaluator (see Limitations). Latency, prompt/completion tokens, and cost are logged automatically per API call and summed per run.
 
----
 
 ## 3. Results
 
@@ -126,6 +118,8 @@ Two worked cases make the diagnosis concrete:
 - **Run 57 (single-shot, Q4).** The model concluded DEWA's intensity "improved consistently" since 2010 - but its own retrieved chunk shows the 2021 reversal. The contradiction is with evidence the model held, so this is a reasoning failure, not a retrieval or corpus failure.
 - **Run 53 (multi-step, Q6).** The model called TNB's net-zero commitment *credible* by reading TNB's stated 5% annual *target* as an achieved trajectory. The intermediate sub-answers show exactly where the target-vs-actual confusion entered, which is the inspectability advantage in action; the ground truth finds none of the three companies credible.
 
+For a deeper case study — a full sub-step walkthrough of **Q1 / Run 48 (235B, multi-step)** that uses the persisted step log to attribute the wrong intensity figures to two distinct upstream causes (an OCR failure on an infographic image for TNB 2019, a value-to-label mapping loss in chart extraction for DEWA 2019), followed by a `prompt-v2` iteration testing whether prompt-rule additions can recover the diagnosed model behaviour — see `case_study_inspectability.md`. It is the most concrete demonstration of how the per-step audit trail this section describes is used to separate upstream failure modes that single-shot's one-row output cannot decompose.
+
 ### 3.4 Latency, token cost, and spend summary
 
 Decomposition is markedly more expensive on every axis. Averaged per run, multi-step uses 59,151 tokens against single-shot's 3,171 (18.7x), takes 358s against 29s (12.5x), and costs $0.0090 against $0.0006 (14.1x).
@@ -138,9 +132,7 @@ Per-run cost is not uniform within multi-step: it scales with the number of sub-
 
 **Spend summary.** The 24 benchmark runs logged here consumed **747,869 tokens for $0.1160** in total (multi-step accounts for $0.108 of that, single-shot $0.008). This is the cost of the final benchmark only.
 
-**[TO SUPPLY - reconcile against the $100 NEBIUS budget.]** The figure above is the logged benchmark spend; it does not include development and validation runs on NEBIUS. Insert the total NEBIUS drawdown against the $100 budget here - that number is not in any current source file.
-
----
+**Total NEBIUS drawdown.** Across all work logged to `logs/token_spend.jsonl` — the final benchmark plus all development and validation runs — total NEBIUS spend was **$0.3932, or 0.4% of the $100 budget**. This breaks down as $0.1226 embedding (Qwen3-Embedding-8B), $0.1771 generation on the 30B, $0.0924 generation on the 235B, and $0.0011 retrieval-eval and smoke-test queries. The $0.1160 benchmark figure above is the subset attributable to the 24 scored runs; the remainder is development and validation generation that does not appear in the benchmark results.
 
 ## 4. Discussion
 
@@ -149,8 +141,6 @@ Per-run cost is not uniform within multi-step: it scales with the number of sub-
 **Extraction quality, not hallucination, caps numeric correctness.** The faithfulness numbers (Section 3.2) and the corruption notes in scoring together point to one conclusion: where answers are numerically wrong, the usual cause is corrupted retrieved text, not model invention. Five runs across Q1 and Q5 carry explicit corpus-corruption notes - a 345% figure where 35% was meant, TNB intensity garbled by roughly 50%, corrupted 2019 endpoints. The effect is visible in the scores: Q5, the most corruption-flagged question, collapses to 0.12 mean correctness across all four configurations while runs stay faithful to the (corrupted) text. Better extraction would most directly raise correctness on exactly these cases, and it would help both pipelines equally - it is orthogonal to the decomposition question.
 
 **The honest boundary.** Not every failure is an extraction problem. Questions Q2 and Q6 score zero across all four configurations and carry no corruption flags. Both are derived-computation questions requiring the calculation of a required annual reduction rate and reasoning over the result, and no run, under either pipeline or either model size, performed that arithmetic. This is a genuine end-to-end limitation of the current pipelines on multi-step quantitative reasoning rather than an artifact of scoring or data quality, and decomposition did not address it. The implications for pipeline design are taken up in Section 7.
-
----
 
 ## 5. Recommendation to Sylvan
 
@@ -164,8 +154,6 @@ Per-run cost is not uniform within multi-step: it scales with the number of sub-
 
 **Bottom line.** Adopt multi-step decomposition selectively - for complex, high-stakes Carbon Performance questions where auditability matters - and keep single-shot for simple lookups. But the single largest available gain for both pipelines is upstream: fixing PDF table extraction would lift numeric correctness more than any pipeline or model change shown here.
 
----
-
 ## 6. Limitations
 
 - **Small sample.** Six questions x two pipelines x two models = 24 runs. Every number in this report is descriptive; no statistical significance is claimed or warranted, and the "weak dominance" of multi-step should be read as a direction, not a tested effect.
@@ -173,8 +161,6 @@ Per-run cost is not uniform within multi-step: it scales with the number of sub-
 - **Correctness is not averaged across questions.** Denominators differ per question (3-5 key claims), so within-question fractions are the only valid comparison; cross-question aggregation uses the verdict tag instead. Any reading that averages the fractions would be invalid.
 - **Corpus corruption caps numeric correctness for every configuration.** Several questions are bounded above by PDF extraction quality rather than by pipeline or model capability, so the correctness ceiling is partly an artifact of the corpus, not of the methods under test.
 - **Unbalanced question set.** Under honest classification the set has one pure-trajectory question, one pure-change-over-time question, and no pure-comparative-without-time question. The comparison is therefore strongest as evidence about synthesis questions and weakest about derived computation, where both pipelines simply failed - so the conclusions generalise most safely to the synthesis case.
-
----
 
 ## 7. Future work
 
@@ -194,8 +180,4 @@ The decomposition study (Section 2.3) adopted Least-to-Most prompting and deferr
 
 These proposals are forward-looking and are not substantiated by the present results; they are stated as the priority next steps that the current findings most directly motivate.
 
----
-
-## Appendices
-
-**[FILL / optional]** Per-run scoring table (the 24-row table from the scoring worksheet), schema reference (point to CONTRIBUTING.md), full decomposition comparison (point to `decomposition_research.md`).
+ 

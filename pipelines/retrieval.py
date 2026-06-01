@@ -5,8 +5,8 @@ Shared retrieval, prompt-formatting, and cost-logging helpers used by both
 the single-shot and multi-step RAG pipelines.
 
 Keeping these in one module is what makes the benchmark comparison fair:
-both pipelines call exactly the same `hybrid_retrieve`, `_select_context_chunks`,
-`_format_context`, and cost-accounting code. The only thing that differs
+both pipelines call exactly the same `hybrid_retrieve`, `select_context_chunks`,
+`format_context`, and cost-accounting code. The only thing that differs
 between the two pipelines is whether the question is posed in one shot or
 decomposed into sub-questions first.
 
@@ -34,6 +34,7 @@ from config import (
     GENERATION_COST_PER_1M_TOKENS,
     GENERATION_COST_RATES,
     NEBIUS_BASE_URL,
+    TOKEN_BUDGET_USD,
     TOKEN_SPEND_LOG,
 )
 
@@ -149,7 +150,6 @@ def load_chunks(conn: sqlite3.Connection) -> list[dict]:
 
 def load_embeddings(conn: sqlite3.Connection, chunk_ids: list[str]) -> dict[str, list[float]]:
     """Load embedding BLOBs for the given chunk_ids and decode them to lists of floats."""
-    log.info("Loading %d embeddings from sqlite-vec ...", len(chunk_ids))
     placeholders = ",".join("?" * len(chunk_ids))
     rows = conn.execute(
         f"SELECT chunk_id, embedding FROM chunk_embeddings WHERE chunk_id IN ({placeholders})",
@@ -200,18 +200,8 @@ def build_index(chunks: list[dict], embeddings_map: dict[str, list[float]]) -> R
 
 
 def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
-    """
-    Load the sqlite-vec extension into conn.
-    Must be called before querying chunk_embeddings (a vec0 virtual table).
-    Mirrors the same helper in embed.py so both scripts use identical setup.
-    """
-    try:
-        import sqlite_vec  # type: ignore
-    except ImportError as exc:
-        raise ImportError("sqlite-vec is not installed. Run: pip install sqlite-vec") from exc
-    conn.enable_load_extension(True)
-    sqlite_vec.load(conn)
-    conn.enable_load_extension(False)
+    """Compatibility hook retained for older docs; no-op in this build."""
+    return None
 
 
 def get_corpus_inventory(db_path: Path) -> str:
@@ -353,7 +343,6 @@ def load_index(db_path: Path) -> RetrievalIndex:
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    _load_sqlite_vec(conn)
     try:
         chunks = load_chunks(conn)
         if not chunks:
@@ -809,9 +798,7 @@ def get_cumulative_spend() -> float:
 
 
 def check_budget(label: str) -> None:
-    """Log cumulative spend and warn at 90% of TOKEN_BUDGET_USD."""
     cumulative = get_cumulative_spend()
-    budget_cap = float(os.environ.get("TOKEN_BUDGET_USD", "100.0"))
-    log.info("[%s] Budget used: $%.4f of $%.2f", label, cumulative, budget_cap)
-    if cumulative >= 0.9 * budget_cap:
-        log.warning("[%s] Cumulative spend >= 90%% of budget (%s).", label, budget_cap)
+    log.info("[%s] Budget used: $%.4f of $%.2f", label, cumulative, TOKEN_BUDGET_USD)
+    if cumulative >= 0.9 * TOKEN_BUDGET_USD:
+        log.warning("[%s] Cumulative spend >= 90%% of budget (%s).", label, TOKEN_BUDGET_USD)

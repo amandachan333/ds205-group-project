@@ -16,9 +16,12 @@ parent_id, page_number, filename, languages, category_depth.
 
 Configuration
 -------------
-Reads from .env at the repo root.
+GEMINI_API_KEY is read from .env at the repo root:
 
     GEMINI_API_KEY            required (https://aistudio.google.com/apikey)
+
+The PDF-processing tunables are read from config.py:
+
     PDF_RASTERISE_DPI         default 200  - higher = better tables, larger payloads
     GEMINI_BATCH_PAGE_LIMIT   default 30   - pages per Gemini API call
     PDF_PARTITION_STRATEGY    default "hi_res"
@@ -36,7 +39,6 @@ import logging
 import os
 import re
 import statistics
-import sys
 import time
 from pathlib import Path
 
@@ -47,8 +49,8 @@ from pdf2image import convert_from_path
 from PIL import Image
 from unstructured.partition.pdf import partition_pdf
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
+import config
+from config import RAW_DIR
 from utils import derive_year, save_jsonl_atomic
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -64,11 +66,11 @@ _GEMINI_MODEL = "gemini-2.5-flash"
 
 # DPI for rasterising PDF pages before sending to Gemini. Higher = better
 # table quality at the cost of larger image payloads and slower API calls.
-_RASTERISE_DPI = int(os.environ.get("PDF_RASTERISE_DPI", "200"))
+_RASTERISE_DPI = config.PDF_RASTERISE_DPI
 
 # Maximum table pages per Gemini API call. Keeps output within token
 # limits and avoids truncation on table-heavy documents.
-_BATCH_PAGE_LIMIT = int(os.environ.get("GEMINI_BATCH_PAGE_LIMIT", "30"))
+_BATCH_PAGE_LIMIT = config.GEMINI_BATCH_PAGE_LIMIT
 
 _TABLE_EXTRACTION_PROMPT = """\
 You are a precise data extraction tool. Extract ALL rows from every table on this page.
@@ -309,8 +311,8 @@ def _split_tables_on_page(page_text: str) -> list[str]:
 
 def extract_elements(pdf_path: Path) -> list[dict]:
     """Partition a PDF via unstructured; re-extract tables using Gemini VLM. Returns one dict per element."""
-    strategy = os.environ.get("PDF_PARTITION_STRATEGY", "hi_res")
-    hi_res_model = os.environ.get("PDF_HI_RES_MODEL", "yolox")
+    strategy = config.PDF_PARTITION_STRATEGY
+    hi_res_model = config.PDF_HI_RES_MODEL
 
     logging.info(
         "extract_elements: strategy=%s  model=%s  file=%s",
@@ -414,7 +416,7 @@ def _extracted_years(extracted_company_dir: Path) -> set[int]:
 
 
 def run_extraction(
-    raw_dir: Path | str = Path("data/raw"),
+    raw_dir: Path | str = RAW_DIR,
     extracted_dir: Path | str = Path("data/extracted"),
     company: str | None = None,
     force: bool = False,
@@ -432,7 +434,7 @@ def run_extraction(
     extracted_dir = Path(extracted_dir)
 
     if hi_res_model is not None:
-        os.environ["PDF_HI_RES_MODEL"] = hi_res_model
+        config.PDF_HI_RES_MODEL = hi_res_model
 
     pdf_candidates = _discover_pdfs(raw_dir, company=company)
     if not pdf_candidates:
@@ -501,6 +503,6 @@ if __name__ == "__main__":
 
     project_root = Path(__file__).resolve().parent.parent
     run_extraction(
-        raw_dir=project_root / "data" / "raw",
+        raw_dir=RAW_DIR,
         extracted_dir=project_root / "data" / "extracted",
     )

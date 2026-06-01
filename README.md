@@ -11,6 +11,8 @@ Qwen3-235B via NEBIUS; the second decomposes each question into ordered sub-ques
 them sequentially using Least-to-Most prompting, and assembles a final response — trading
 compute cost for measurably higher correctness on complex multi-company questions.
 
+The **final report dictating our overall findings and recommendations** can be found [here](docs/report.md).
+
 ---
 
 ## What These Pipelines Do
@@ -269,7 +271,7 @@ to the LtM choice. It is not documentation of the implemented system.
    used to call NEBIUS.
 
    ```bash
-   conda env create -f environment.yml
+   conda env create -f environment_windows.yml
    conda activate tpi-rag
    ```
 
@@ -281,23 +283,29 @@ to the LtM choice. It is not documentation of the implemented system.
    conda activate tpi-rag
    ```
 
-3. **Copy `.env.example` to `.env` and fill in your API keys.** The pipeline reads all
+3. **Run `pip install -e .` from the project root**. 
+   ```bash
+   pip install -e .
+   ```
+
+   You should see a line like `Successfully installed tpi-rag-0.1.0`.
+
+4. **Copy `.env.example` to `.env` and fill in your API keys.** The pipeline reads all
    credentials from `.env` at startup; no script accepts keys as command-line arguments.
 
    ```bash
    cp .env.example .env
-   # Open .env in a text editor and fill in at minimum NEBIUS_API_KEY and GEMINI_API_KEY
+   # Open .env in a text editor and fill in NEBIUS_API_KEY and GEMINI_API_KEY
    ```
 
 ### Setting up your .env file
 
-| Variable | Required for | Example / default |
+| Variable | Required for | Value |
 |---|---|---|
-| `NEBIUS_API_KEY` | Embedding and all generation calls | `your-nebius-key` |
-| `NEBIUS_BASE_URL` | NEBIUS API endpoint | `https://api.studio.nebius.com/v1/` |
-| `GEMINI_API_KEY` | PDF table extraction (`pipelines/extract.py`) only | `your-gemini-key` |
-| `RAG_GENERATION_MODEL` | Override the default generation model | `Qwen/Qwen3-30B-A3B-Instruct-2507` |
-| `TOKEN_BUDGET_USD` | Budget cap; pipeline warns at 90% of this value | `100.0` |
+| `NEBIUS_API_KEY` | All embedding and generation calls | `your-nebius-key` |
+| `GEMINI_API_KEY` | PDF table extraction only; not needed if extraction is already complete | `your-gemini-key` |
+
+`NEBIUS_API_KEY` and `GEMINI_API_KEY` must be filled in manually. These are the only values that belong in `.env` — all other pipeline parameters are hardcoded constants in `config.py`.
 
 `.env` is gitignored and must never be committed. It contains credentials that would grant
 full NEBIUS and Gemini API access to anyone who obtains the file.
@@ -378,7 +386,7 @@ embeddings produced by NEBIUS Qwen3-Embedding-8B.
 `NEBIUS_API_KEY` is required. Chunks are sent to the NEBIUS embedding API in batches of 16; a
 300ms pause between batches is applied as a conservative rate-limit guard. Token spend is
 logged to `logs/token_spend.jsonl` as each batch completes, so you can monitor cost in real
-time. Embedding the full corpus cost $0.0393 (3,926,175 tokens).
+time. Embedding the full corpus cost $0.0409.
 
 If `data/vector_store.db` already exists — from a previous embed run or shared by a teammate
 — this step can be skipped. Both pipelines read the vector store at runtime but never write
@@ -561,11 +569,11 @@ inspectability examples (Runs 57 and 53). Figures are saved to `docs/images/`.
 
 | Item | Cost | Tokens |
 |---|---|---|
-| Embedding — Qwen3-Embedding-8B | $0.0393 | 3,926,175 tokens |
+| Embedding — Qwen3-Embedding-8B | $0.1226 | 6,298,101 tokens |
 | Generation — Qwen3-30B | $0.1771 | 433 calls; 1.54M prompt + 76K completion |
 | Generation — Qwen3-235B | $0.0924 | 126 calls; 395K prompt + 22K completion |
 | Retrieval eval queries | $0.0001 | — |
-| **Grand total** | **$0.3512** | **0.4% of $100 NEBIUS budget** |
+| **Grand total** | **$0.3932** | **0.4% of $100 NEBIUS budget** |
 
 ### Generation cost by pipeline phase
 
@@ -621,20 +629,10 @@ factual retrieval where retrieval coverage of a single company or year is suffic
 | Variable | Description | Default | Required |
 |---|---|---|---|
 | `NEBIUS_API_KEY` | NEBIUS API authentication | — | Yes |
-| `NEBIUS_BASE_URL` | NEBIUS API endpoint | `https://api.studio.nebius.com/v1/` | No |
 | `GEMINI_API_KEY` | Gemini API authentication for table extraction | — | Only for `extract.py` |
-| `RAG_GENERATION_MODEL` | Default generation model for both pipelines | `Qwen/Qwen3-30B-A3B-Instruct-2507` | No |
-| `TOKEN_BUDGET_USD` | Total budget cap; `check_budget()` warns at 90% | `100.0` | No |
 | `GENERATION_COST_PER_1M_TOKENS` | Fallback cost rate for model strings not in the pricing dict | `0.02` | No |
-| `PDF_DIR` | Root directory for source PDFs | `data/raw` | No |
-| `PDF_GLOB` | Glob pattern for PDF discovery within `PDF_DIR` | `**/*.pdf` | No |
-| `PDF_PARTITION_STRATEGY` | `unstructured` partition strategy | `hi_res` | No |
-| `PDF_HI_RES_MODEL` | Layout model used by hi_res | `yolox` | No |
-| `PDF_RASTERISE_DPI` | DPI for PDF rasterisation before Gemini | `200` | No |
-| `GEMINI_BATCH_PAGE_LIMIT` | Max pages per Gemini API call | `30` | No |
 
-All variables are read from `.env` at startup via `python-dotenv`. Variables with a non-blank
-default are optional — the pipeline uses the default if the variable is absent from `.env`.
+`NEBIUS_API_KEY` and `GEMINI_API_KEY` are the only variables that belong in `.env`. All other pipeline parameters are hardcoded constants — see the Key constants section in `CONTRIBUTING.md` to change them.
 
 ---
 
@@ -651,12 +649,11 @@ default are optional — the pipeline uses the default if the variable is absent
 - `evaluation/ground_truth.md` — the frozen benchmark question set and expected answers
 - `evaluation/scoring_worksheet.md` — completed human-scored worksheet
 - `evaluation/faithfulness_all.md` — completed faithfulness sheet
-- `DECISIONS_EXTRACTED.md` — factual record of architectural decisions and post-hoc rationale
 - `db/schema.sql` — canonical database schema
 
 **Sharing the vector store:** `data/vector_store.db` is gitignored. A teammate can share it
 directly (e.g. via the Nuvolos shared mount or `scp`). If no shared copy is available,
-recreate it by running `embed.py` — this cost $0.0393 in our benchmark run and takes as long
+recreate it by running `embed.py` — this cost $0.0409 in the most recent run and takes as long
 as the embedding API allows for the full corpus.
 
 **Recreating the benchmark database from scratch:**

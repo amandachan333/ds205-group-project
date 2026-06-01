@@ -101,6 +101,24 @@ model string being used matches a key in the dict. Proposed fix: add a warning l
 `retrieval.py:log_generation_spend()` when the model string does not match any key in
 `GENERATION_COST_RATES`, so rate drift is surfaced at generation time.
 
+**Key constants**
+
+*Path constants* (all hardcoded as `Path` objects): `RAW_DIR`, `EXTRACTED_DIR`, `CHUNKED_DIR`, `VECTOR_STORE_PATH`, `BENCHMARK_DB_PATH`, `LOG_DIR`, `TOKEN_SPEND_LOG`
+
+*Chunking parameters* (all hardcoded ints): `MAX_CHUNK_SIZE=1000`, `SENTENCE_OVERLAP=2`, `MIN_CHUNK_LENGTH=100`, `MAX_CHUNK_LENGTH=2000`
+
+*Embedding configuration* (all hardcoded): `EMBEDDING_MODEL="Qwen/Qwen3-Embedding-8B"`, `EMBEDDING_DIM=4096`, `EMBED_BATCH_SIZE=16`, `EMBED_RETRY_ATTEMPTS=3`, `EMBED_RETRY_SLEEP_S=5.0`, `EMBED_COST_PER_1M_TOKENS=0.01`
+
+*NEBIUS configuration*:
+- `NEBIUS_BASE_URL` — `os.environ.get` with hardcoded fallback `"https://api.studio.nebius.com/v1/"`
+- `RAG_GENERATION_MODEL` — `os.environ.get` with hardcoded fallback `"Qwen/Qwen3-30B-A3B-Instruct-2507"`
+- `GENERATION_COST_RATES` — hardcoded dict of per-model input/output rates for `Qwen3-30B-A3B-Instruct-2507` and `Qwen3-235B-A22B-Instruct-2507`
+- `GENERATION_COST_PER_1M_TOKENS=0.02` — `os.environ.get` fallback rate for models not in `GENERATION_COST_RATES`
+
+*PDF extraction configuration* (all hardcoded — these were moved from `.env` to `config.py`; change them here, not in `.env`): `PDF_RASTERISE_DPI=200`, `GEMINI_BATCH_PAGE_LIMIT=30`, `PDF_PARTITION_STRATEGY="hi_res"`, `PDF_HI_RES_MODEL="yolox"`
+
+To change any pipeline tuning parameter, start here. Do not add these to `.env` — they are not secrets and do not vary between environments.
+
 ---
 
 ### `pipelines/extract.py`
@@ -109,9 +127,7 @@ Extracts text and table content from source PDFs and writes per-document JSONL t
 `data/extracted/`. Uses `unstructured` hi_res with the yolox layout model for text elements
 and section headings, and Gemini Vision for table pages.
 
-**CLI flags:** `--company` restricts extraction to one company's PDFs. `PDF_PARTITION_STRATEGY`
-and `PDF_HI_RES_MODEL` can be overridden via environment variable. `PDF_RASTERISE_DPI`
-(default 200) and `GEMINI_BATCH_PAGE_LIMIT` (default 30) control Gemini behaviour.
+**CLI flags:** `--company` restricts extraction to one company's PDFs. `PDF_PARTITION_STRATEGY`, `PDF_HI_RES_MODEL`, `PDF_RASTERISE_DPI`, and `GEMINI_BATCH_PAGE_LIMIT` are hardcoded constants in `config.py` — change them there, not in `.env`.
 
 **Key decision — Gemini Vision for table pages over relying on `unstructured` alone:**
 `unstructured` hi_res extracts Table elements as flattened text strings, losing column
@@ -202,11 +218,7 @@ the sqlite-vec extension. The embed pipeline does not use sqlite-vec virtual tab
 no-op is functionally harmless — but it misleads any developer who searches for sqlite-vec
 usage. Proposed fix: remove the no-op function from `embed.py` entirely.
 
-**Token budget:** total embed cost is tracked in `logs/token_spend.jsonl`. The pipeline's
-`check_budget()` function (called from `retrieval.py`) sums `cost_usd` across all record
-types and warns to stderr when cumulative spend reaches 90% of the `TOKEN_BUDGET_USD`
-environment variable (default $100.0). Embedding the full corpus cost $0.0393 in our
-benchmark run.
+**Token budget:** total embed cost is tracked in `logs/token_spend.jsonl`. The pipeline's `check_budget()` function (called from `retrieval.py`) sums `cost_usd` across all record types and warns to stderr when cumulative spend reaches 90% of the `TOKEN_BUDGET_USD` (set to $100.0 in `config.py`). Embedding the full corpus cost $0.0409 in the most recent embedding run.
 
 ---
 

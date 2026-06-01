@@ -15,7 +15,19 @@ from pathlib import Path
 RAW_DIR: Path = Path("data/raw")
 EXTRACTED_DIR: Path = Path("data/extracted")
 CHUNKED_DIR: Path = Path("data/chunked")
-DB_PATH: Path = Path("data/vector_store.db")
+
+# Vector embeddings store, written by pipelines/embed.py.
+# Stable across benchmark runs; rebuilt only when chunks change.
+VECTOR_STORE_PATH: Path = Path("data/vector_store.db")
+
+# Benchmark runtime DB, written by the RAG pipelines and read by evaluation scripts.
+# Holds questions, runs, decompositions, steps, final answers, evaluations.
+BENCHMARK_DB_PATH: Path = Path("db/benchmark.db")
+
+# Deprecated alias — kept so existing imports don't break.
+# New code should import VECTOR_STORE_PATH or BENCHMARK_DB_PATH explicitly.
+DB_PATH: Path = VECTOR_STORE_PATH
+
 LOG_DIR: Path = Path("logs")
 
 # Token-spend audit trail (appended to by embed.py)
@@ -28,6 +40,14 @@ MAX_CHUNK_SIZE: int = 1_000  # target max chars before starting a new chunk
 SENTENCE_OVERLAP: int = 2  # sentences carried forward into the next chunk
 MIN_CHUNK_LENGTH: int = 100  # merge chunks shorter than this (chars)
 MAX_CHUNK_LENGTH: int = 2_000  # hard-split threshold (chars)
+
+# ---------------------------------------------------------------------------
+# PDF extraction  (used by pipelines/extract.py)
+# ---------------------------------------------------------------------------
+PDF_RASTERISE_DPI: int = 200  # higher = better tables, larger payloads
+GEMINI_BATCH_PAGE_LIMIT: int = 30  # pages per Gemini API call
+PDF_PARTITION_STRATEGY: str = "hi_res"
+PDF_HI_RES_MODEL: str = "yolox"
 
 # ---------------------------------------------------------------------------
 # Embedding
@@ -56,3 +76,15 @@ GENERATION_COST_RATES = {
 
 # NEBIUS base URL
 NEBIUS_BASE_URL: str = os.environ.get("NEBIUS_BASE_URL", "https://api.studio.nebius.com/v1/")
+
+# ---------------------------------------------------------------------------
+# Generation
+# ---------------------------------------------------------------------------
+RAG_GENERATION_MODEL: str = os.environ.get(
+    "RAG_GENERATION_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507"
+)
+
+# ---------------------------------------------------------------------------
+# Budget
+# ---------------------------------------------------------------------------
+TOKEN_BUDGET_USD: float = float(os.environ.get("TOKEN_BUDGET_USD", "100.0"))
