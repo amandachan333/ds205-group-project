@@ -283,12 +283,19 @@ to the LtM choice. It is not documentation of the implemented system.
    conda activate tpi-rag
    ```
 
-3. **Copy `.env.example` to `.env` and fill in your API keys.** The pipeline reads all
+3. **Run `pip install -e .` from the project root**. 
+   ```bash
+   pip install -e .
+   ```
+
+   You should see a line like `Successfully installed tpi-rag-0.1.0`.
+
+4. **Copy `.env.example` to `.env` and fill in your API keys.** The pipeline reads all
    credentials from `.env` at startup; no script accepts keys as command-line arguments.
 
    ```bash
    cp .env.example .env
-   # Open .env in a text editor and fill in at minimum NEBIUS_API_KEY and GEMINI_API_KEY
+   # Open .env in a text editor and fill in NEBIUS_API_KEY and GEMINI_API_KEY
    ```
 
 ### Setting up your .env file
@@ -386,7 +393,7 @@ embeddings produced by NEBIUS Qwen3-Embedding-8B.
 `NEBIUS_API_KEY` is required. Chunks are sent to the NEBIUS embedding API in batches of 16; a
 300ms pause between batches is applied as a conservative rate-limit guard. Token spend is
 logged to `logs/token_spend.jsonl` as each batch completes, so you can monitor cost in real
-time. Embedding the full corpus cost $0.0393 (3,926,175 tokens).
+time. Embedding the full corpus cost $0.0409.
 
 If `data/vector_store.db` already exists — from a previous embed run or shared by a teammate
 — this step can be skipped. Both pipelines read the vector store at runtime but never write
@@ -569,11 +576,11 @@ inspectability examples (Runs 57 and 53). Figures are saved to `docs/images/`.
 
 | Item | Cost | Tokens |
 |---|---|---|
-| Embedding — Qwen3-Embedding-8B | $0.0817 | 3,926,175 tokens |
+| Embedding — Qwen3-Embedding-8B | $0.1226 | 6,298,101 tokens |
 | Generation — Qwen3-30B | $0.1771 | 433 calls; 1.54M prompt + 76K completion |
 | Generation — Qwen3-235B | $0.0924 | 126 calls; 395K prompt + 22K completion |
 | Retrieval eval queries | $0.0001 | — |
-| **Grand total** | **$0.3512** | **0.4% of $100 NEBIUS budget** |
+| **Grand total** | **$0.3932** | **0.4% of $100 NEBIUS budget** |
 
 ### Generation cost by pipeline phase
 
@@ -660,7 +667,7 @@ default are optional — the pipeline uses the default if the variable is absent
 
 **Sharing the vector store:** `data/vector_store.db` is gitignored. A teammate can share it
 directly (e.g. via the Nuvolos shared mount or `scp`). If no shared copy is available,
-recreate it by running `embed.py` — this cost $0.0393 in our benchmark run and takes as long
+recreate it by running `embed.py` — this cost $0.0409 in the most recent run and takes as long
 as the embedding API allows for the full corpus.
 
 **Recreating the benchmark database from scratch:**

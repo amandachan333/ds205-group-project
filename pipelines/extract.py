@@ -39,7 +39,6 @@ import logging
 import os
 import re
 import statistics
-import sys
 import time
 from pathlib import Path
 
@@ -49,8 +48,6 @@ from google.genai import types
 from pdf2image import convert_from_path
 from PIL import Image
 from unstructured.partition.pdf import partition_pdf
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import config
 from utils import derive_year, save_jsonl_atomic

@@ -39,20 +39,16 @@ import logging
 import os
 import sqlite3
 import struct
-import sys
 import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from openai import OpenAI
 
 from config import (
     CHUNKED_DIR,
-    DB_PATH,
     EMBED_BATCH_SIZE,
     EMBED_COST_PER_1M_TOKENS,
     EMBED_RETRY_ATTEMPTS,
@@ -62,6 +58,7 @@ from config import (
     LOG_DIR,
     NEBIUS_BASE_URL,
     TOKEN_SPEND_LOG,
+    VECTOR_STORE_PATH,
 )
 from utils import bootstrap_runtime_env, ensure_stage_dirs, load_jsonl
 
@@ -453,7 +450,7 @@ def main() -> None:
     parser.add_argument(
         "--db-path",
         type=Path,
-        default=DB_PATH,
+        default=VECTOR_STORE_PATH,
         help="Path to the SQLite vector store.",
     )
     parser.add_argument(

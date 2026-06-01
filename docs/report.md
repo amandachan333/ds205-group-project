@@ -132,7 +132,7 @@ Per-run cost is not uniform within multi-step: it scales with the number of sub-
 
 **Spend summary.** The 24 benchmark runs logged here consumed **747,869 tokens for $0.1160** in total (multi-step accounts for $0.108 of that, single-shot $0.008). This is the cost of the final benchmark only.
 
-**Total NEBIUS drawdown.** Across all work logged to `logs/token_spend.jsonl` — the final benchmark plus all development and validation runs — total NEBIUS spend was **$0.3512, or 0.4% of the $100 budget**. This breaks down as $0.0817 embedding (Qwen3-Embedding-8B), $0.1771 generation on the 30B, $0.0924 generation on the 235B, and $0.0001 retrieval-eval queries. The $0.1160 benchmark figure above is the subset attributable to the 24 scored runs; the remainder is development and validation generation that does not appear in the benchmark results.
+**Total NEBIUS drawdown.** Across all work logged to `logs/token_spend.jsonl` — the final benchmark plus all development and validation runs — total NEBIUS spend was **$0.3932, or 0.4% of the $100 budget**. This breaks down as $0.1226 embedding (Qwen3-Embedding-8B), $0.1771 generation on the 30B, $0.0924 generation on the 235B, and $0.0011 retrieval-eval and smoke-test queries. The $0.1160 benchmark figure above is the subset attributable to the 24 scored runs; the remainder is development and validation generation that does not appear in the benchmark results.
 
 ## 4. Discussion
 
