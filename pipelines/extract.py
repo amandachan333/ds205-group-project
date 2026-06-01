@@ -1,3 +1,36 @@
+"""
+Stage 1 of the ingestion pipeline: extract structured elements from
+carbon performance PDFs.
+
+Each PDF is partitioned into discrete elements (paragraphs, headers,
+lists, tables) and written as one JSON record per element to a JSONL
+file, ready for chunking by chunk.py.
+
+Inputs and outputs
+------------------
+Input:   data/raw/<company>/*.pdf
+Output:  data/extracted/<company>/<company>_<year>_elements.jsonl
+
+Each output record contains: text, element_type, element_id,
+parent_id, page_number, filename, languages, category_depth.
+
+Configuration
+-------------
+Reads from .env at the repo root.
+
+    GEMINI_API_KEY            required (https://aistudio.google.com/apikey)
+    PDF_RASTERISE_DPI         default 200  - higher = better tables, larger payloads
+    GEMINI_BATCH_PAGE_LIMIT   default 30   - pages per Gemini API call
+    PDF_PARTITION_STRATEGY    default "hi_res"
+    PDF_HI_RES_MODEL          default "yolox"
+
+Usage
+-----
+Run from the repo root:
+
+    python pipelines/extract.py        # extracts all companies under data/raw/
+"""
+
 import io
 import logging
 import os

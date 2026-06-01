@@ -530,7 +530,20 @@ enforcement (`PRAGMA foreign_keys = ON`) is enabled on every connection to `benc
 - `pathlib.Path` not string concatenation for all file paths.
 - Environment variables loaded via `python-dotenv` at module level through `utils.py` —
   never hardcoded, never read with `os.environ` directly in pipeline files.
-- Ruff for linting. Run `ruff check .` before committing.
+- [Ruff](https://docs.astral.sh/ruff/) for linting and formatting. Configuration lives in `pyproject.toml`.
+   - Before pushing, run:
+
+      ```bash
+      ruff check . --fix    # lint and auto-fix
+      ruff format .         # format
+      ```
+   - Both checks also run in CI on every push and pull request via `.github/workflows/lint.yml`. If CI is red, fix it locally and push again rather than overriding the check.
+- [pytest](https://docs.pytest.org/) for unit tests. Tests live in
+`tests/` and configuration is in `pytest.ini`.
+   - The suite covers deterministic logic only — chunker helpers, utility
+   functions, and database schema. It does NOT test the LLM pipelines or
+   retrieval quality; those are evaluated separately via the benchmark
+   runs.
 
 ### Commit conventions
 
