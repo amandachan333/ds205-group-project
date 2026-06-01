@@ -1,298 +1,222 @@
 # AGENTS.md
 
-This document records how AI coding tools were used during development of the
-tpi-rag-decomposition project. It is written for two audiences: future contributors
-who want to use AI tools effectively on this codebase, and the module marker who
-needs evidence of intentional human oversight of AI-generated code.
+Operational guide for AI coding agents (and humans) working in this repo: how to set up,
+run, test, and modify the codebase, and what not to touch. Read this before doing any
+work here.
 
----
+**Looking for how AI tools were *used to build* this project** — development history,
+evidence of human oversight, prompt patterns that worked? That lives in
+[`docs/AI_USAGE.md`](docs/AI_USAGE.md), not this file. This file is forward-looking instructions; that one
+is a backward-looking record.
 
-## 1. Session conventions
+For *why* things are built this way, read `DECISIONS.md`; for module responsibilities
+and the SQLite schema, read `CONTRIBUTING.md`.
 
-Every Claude Code session opened with the same standing instruction:
+## Start every session here
 
-```
-Read these files before doing anything:
-
-"README.md"
-"CONTRIBUTING.md"
-"DECISIONS.md"
-
-These establish what the project is and what conventions were followed.
-Confirm you have read all three before continuing.
-```
-
-This was not a one-off instruction. It was given at the start of every session,
-before any code or documentation task was described.
-
-The three files cover different scopes and together constrain the space of
-acceptable outputs:
-
-- **README.md** establishes user-facing behaviour — what the pipelines do, how to
-  run them, and what outputs they produce. Without it, AI tools default to generic
-  patterns: a `main.py` entry point, a `requirements.txt`, argparse where we use
-  YAML config. Reading README.md first means generated code targets the actual
-  interface, not a reasonable guess at one.
-
-- **CONTRIBUTING.md** establishes implementation conventions — the repo structure,
-  how data flows through the SQLite schema, the write sequence per run, and which
-  modules own which responsibilities. Without it, AI tools will make sensible but
-  inconsistent choices: importing `sqlite3` directly in pipeline files instead of
-  routing through `db/database.py`, or using `print()` instead of `logging`.
-
-- **DECISIONS.md** records architectural rationale — why we chose LtM over ReAct,
-  why reranking was dropped, why the vector store is SQLite and not ChromaDB. Without
-  it, AI tools will re-introduce removed components or argue for alternatives we
-  already considered and rejected, which wastes time and risks re-opening settled
-  questions.
-
-Together, these three files tell the AI what the project does, how it is built, and
-why it is built that way. Any two of the three leaves a gap.
-
-We also consistently asked for tasks to be broken into steps before any code or
-documentation was written. The prompt pattern was:
+Before writing or changing anything, read these three files and confirm you have:
 
 ```
-Before writing any code, describe in plain English:
-
-- What the function/module will do
-- What its inputs and outputs are
-- What edge cases it needs to handle
-
-Then wait for confirmation before writing the code.
+README.md         — what the pipelines do, how to run them, what they output
+CONTRIBUTING.md   — module responsibilities, SQLite schema, conventions, known limits
+DECISIONS.md      — locked architectural choices and their rationale
 ```
 
-Planning before implementation surfaces misunderstandings about scope before tokens
-are spent on the wrong thing. On this project, the planning step for the multi-step
-pipeline orchestrator revealed that the original description implied the decomposer
-and solver were separate processes rather than sequential calls within one run —
-catching that before implementation saved a complete rewrite of the step-insert logic.
+They are not interchangeable: README is user-facing behaviour, CONTRIBUTING is
+implementation convention, DECISIONS is settled rationale. Skipping any one of them
+leads to plausible-but-wrong defaults (a `main.py` entry point, `requirements.txt`,
+`print()` instead of `logging`, or re-proposing components that were deliberately cut).
 
----
+Then follow these working practices:
 
-## 2. Where AI tools helped most
+- **Plan before implementing.** For any non-trivial function or module, describe in
+  plain English what it does, its inputs/outputs, and edge cases, and get confirmation
+  before writing code.
+- **Search before you write a helper.** Utility functions live in `utils.py` and
+  `config.py`. Do not re-implement something that already exists — `stable_qid` is
+  already duplicated across three files (see Gotchas) and must not gain a fourth copy.
+- **Validate against the filesystem, not the plan.** Any description of repo structure
+  or the technical stack must be checked against the actual files and against
+  `DECISIONS.md`. Planning-era artifacts (`docs/decomposition_research.md`,
+  `CODEBASE_AUDIT.md`) describe superseded intentions, not the running system.
 
-**Task 1 — Repurposing the Problem Set 2 pipeline**
+## Project overview
 
-The core retrieval, embedding, and chunking stages were adapted from a working
-pipeline built in Problem Set 2 for a different document corpus. AI tools handled
-this translation cleanly because the architecture was already established — the
-task was adaptation, not design. The embedding call signatures, chunking parameters,
-and BM25 hybrid merge logic from Problem Set 2 transferred directly into the
-`pipelines/` directory, with changes limited to swapping document IDs, adjusting chunk
-size to match the TPI PDF structure, and updating the vector store schema column
-names. The output was verifiable against the source pipeline: we ran both on the same
-test query and compared retrieved chunks by cosine similarity score, confirming the
-ported version produced identical rankings. When the task is adaptation rather than
-design and the source is a verified working implementation, AI-generated output is
-trustworthy with light inspection.
+Two RAG pipelines — **single-shot** and **multi-step (Least-to-Most decomposition)** —
+answer structured carbon-performance questions about three electrical utilities (DEWA,
+CenterPoint, TNB) from TPI sustainability reports. Shared prep (`extract → chunk →
+embed`) builds a local SQLite vector store; at query time each pipeline does hybrid
+BM25+dense retrieval with RRF fusion and value-aware context selection, then generates
+via NEBIUS-hosted Qwen3 MoE models. Runs persist to `db/benchmark.db` and are scored
+through a manual evaluation workflow. The benchmark is a 2×2 design (pipeline × model
+size) over 6 frozen ground-truth questions.
 
-**Task 2 — Auditing for duplicate functions**
+## Environment & setup
 
-We used AI to audit the codebase for duplicated logic across pipeline files. This
-surfaced the `stable_qid` function — a SHA-1 hash used to derive stable question IDs
-from question text — existing independently in `single_shot_rag.py`,
-`multi_step_rag.py`, and `scripts/migrate_qn_ids.py`. The audit output was used
-directly: the duplication is documented in CONTRIBUTING.md as a known limitation
-rather than silently refactored, because removing it would have required changes
-across files that had no test coverage at the point the audit ran. This task is
-well-suited to AI tools because it requires reading many files in sequence without
-making design judgements. The AI was not asked to fix the duplication — it was asked
-to find it. The decision about what to do was made by the team.
+Assumes Windows (primary) or Linux/Nuvolos. Conda + pip. Run everything from repo root.
 
-**Task 3 — Generating structured boilerplate**
+```bash
+# Windows
+conda env create -f environment_windows.yml
+# Linux/Nuvolos
+conda env create -f environment_nuvolos.yml
 
-The SQLite schema (`db/schema.sql`), the token spend JSONL record structure
-(`logs/token_spend.jsonl`), and the database read/write functions (`db/database.py`)
-were generated with AI assistance. These are high-structure, low-ambiguity tasks:
-the schema tables, column names, and types had been defined in CONTRIBUTING.md
-before any code was generated, so the output could be verified by inspection against
-the spec. The generated `CREATE TABLE` statements, `INSERT OR IGNORE` setup logic,
-and `PRAGMA foreign_keys = ON` connection setup were adopted as-is. Light editing
-was needed to align a handful of column names — `total_tokens` vs `token_count` in
-the `runs` table — that differed between the spec in CONTRIBUTING.md and the first
-draft. The structure required no redesign.
-
----
-
-## 3. Where AI tools needed correction
-
-**Case 1 — Assembly `max_tokens` set without rationale**
-
-When scaffolding `multi_step_rag.py`, the assembly LLM call was given
-`max_tokens=2048` while sub-question calls received `max_tokens=1024`. The AI
-generated both values without comment or rationale. A maintainer reading the file
-later would have no way to know whether the difference was intentional or a copy
-error. We retained the values after verifying that no truncation was observed at
-1024 during sub-question answering across the six benchmark questions — 1024 tokens
-is sufficient for a focused factual answer to a single sub-question. We then added
-a comment and a note to CONTRIBUTING.md documenting the reasoning: assembly
-synthesises findings across all sub-questions and is a longer output task than any
-individual step, so it warrants a higher ceiling. The AI produced working values but
-not the justification a maintainer would need.
-
-**Case 2 — CONTRIBUTING.md repo structure reflected the plan, not the codebase**
-
-The initial CONTRIBUTING.md was generated with a repo structure that matched the
-early planned layout: `pipelines/single_shot/` and `pipelines/multi_step/`
-subdirectories, `evaluation/harness.py`, `evaluation/scorer.py`. By the time the
-documentation was written, the actual structure had diverged significantly — flat
-`pipelines/*.py` files rather than subdirectories, and evaluation scripts used as
-scoring aids rather than as pipeline stages with their own module boundary. The error
-was caught by running a codebase audit before accepting the output: listing actual
-files and comparing them against the generated structure. The repo structure section
-in CONTRIBUTING.md was rewritten against the filesystem, not the mental model the
-prompt had implied. AI-generated repo documentation must always be validated against
-the actual filesystem. It will describe what a well-structured project of this type
-typically looks like, which is not the same as what this specific project contains.
-
-**Case 3 — `report.md` listed components that were never implemented**
-
-A draft of `report.md` described the shared stack as including a "local ms-marco-
-MiniLM-L-6-v2 cross-encoder rerank" and "ChromaDB vector store". Neither was used
-in the final implementation. The reranker was cut from scope before implementation
-(documented in DECISIONS.md). The vector store is SQLite, not ChromaDB. The error
-originated in early planning notes that the AI incorporated into the report draft
-without checking whether they described the current implementation or a superseded
-plan. The error was caught during a cross-document consistency review — reading
-DECISIONS.md against the report draft and finding the contradiction. Fixed in
-DECISIONS.md and the report before submission. Any document that describes the
-technical stack must be checked against the actual codebase, not against earlier
-planning notes or design documents that may have been superseded.
-
-**Case 4 — Self-contained scripts created duplicate utility functions**
-
-When generating pipeline scripts independently in separate sessions, the AI kept
-each script self-contained by implementing `stable_qid` directly rather than
-importing it from a shared location. The result was three copies of the same
-SHA-1 hash function across `single_shot_rag.py`, `multi_step_rag.py`, and
-`scripts/migrate_qn_ids.py`. This is documented in CONTRIBUTING.md as known tech
-debt. The pattern recurs because each session started from the same context files
-but the AI had no way to know what utility functions had been written in previous
-sessions unless explicitly told. The fix is a standing instruction: when adding any
-new script, explicitly ask the AI to search for existing utility functions before
-implementing new ones. Generating scripts in isolation produces locally coherent but
-globally inconsistent code.
-
----
-
-## 4. Decisions kept out of AI scope
-
-The following decisions were made by the team without AI assistance.
-
-**Decomposition design.** The choice of Least-to-Most over Chain-of-Thought,
-Self-Ask, and ReAct was made after the team read and discussed the analysis in
-`decomposition_research.md`. The sub-question boundaries for each question type —
-what sub-questions a trajectory question decomposes into, what sub-questions a
-change-over-time question decomposes into — were defined by the team because they
-depend on understanding what a TPI Carbon Performance assessor actually needs to
-establish: which intensity figures, across which years, against which baselines,
-and whether targets were met or revised. That judgment is about the domain, not the
-technology. AI tools could have proposed a decomposition structure, but the team
-would have had no reliable way to evaluate whether the proposed sub-questions were
-the right ones without already understanding the domain well enough to do it
-themselves.
-
-**Ground truth construction.** The six benchmark questions and their reference
-answers were written before any pipeline was built, derived manually from the source
-PDFs with specific page numbers, section titles, and chunk IDs recorded for
-traceability. Two team members cross-checked each answer independently before
-freezing the set. This could not be delegated to AI tools: the ground truth defines
-what "correct" means for the entire benchmark, and AI-generated ground truth would
-make the evaluation circular. A model that misreads a density table and produces a
-plausible but wrong intensity figure would score well against a reference answer
-derived from the same misread.
-
-**The key-claim fraction metric.** The decision to score correctness as k/n key
-claims rather than the brief's proposed three-level label (correct / partial /
-incorrect) was made during actual scoring, after finding that the three-level label
-could not cleanly separate the four pipeline configurations. Several answers were
-partially correct in ways that the three-level label collapsed together — two
-conditions might both be "partial" while one matched six of eight key claims and the
-other matched two of eight. The fraction metric made these differences visible and
-the comparisons meaningful. This methodological adjustment required seeing real
-results: it cannot be anticipated in advance and was not suggested by AI.
-
-**The three-way faithfulness classification.** Distinguishing supported, unsupported,
-and corpus-error claims was a methodological decision made during scoring when
-extraction artifacts in Q5 caused answers to be faithful to wrong text. A pipeline
-that accurately reproduced a misextracted table value should not receive the same
-faithfulness score as one that hallucinated a figure with no source in the retrieved
-chunks. Collapsing corpus-error into "unsupported" would have misattributed
-data-quality failures to model hallucination and made the faithfulness scores
-misleading as a measure of pipeline quality. The distinction required understanding
-the cause of specific observed failures, not pattern-matching to a scoring rubric.
-
-**The recommendation to Sylvan.** The conclusion that multi-step decomposition is
-worth adopting selectively for high-stakes analytical questions, and that the largest
-available gain for both pipelines is upstream extraction quality, was written by the
-team. It required interpreting what the benchmark results mean for TPI's actual use
-case — how often assessors ask trajectory and change-over-time questions, what the
-cost of a wrong answer is, and where the marginal return on additional engineering
-effort is highest. That is a domain and stakeholder judgment, not a summarisation
-task.
-
----
-
-## 5. Prompt patterns that worked
-
-**Pattern 1 — Context-first instruction**
-
-```
-Read [file A], [file B], and [file C] before doing anything.
-Confirm you have read all three before continuing.
+conda activate tpi-rag          # Python 3.11
+cp .env.example .env            # then fill in keys
 ```
 
-Loading the relevant context files before any task prevents AI tools from defaulting
-to generic patterns. On this project, reading CONTRIBUTING.md before generating any
-code meant the output used `logging` not `print()`, `pathlib` not string
-concatenation, and typed function signatures — without needing to repeat these
-requirements in every prompt. The confirmation step matters: it creates a checkpoint
-where the AI summarises what it found, which surfaces cases where a file was read but
-its constraints were not understood.
+Required `.env` keys: `NEBIUS_API_KEY` (always), `GEMINI_API_KEY` (extraction only).
+All other vars have defaults — see `.env.example`. Env is loaded centrally via
+`utils.bootstrap_runtime_env()`; do not call `load_dotenv` ad hoc in new files.
 
-**Pattern 2 — Plan before implement**
+System deps (poppler, tesseract, pillow) come from the conda env files. Do not assume
+a global install.
 
-```
-Before writing any code, describe in plain English:
+## Commands
 
-- What the function/module will do
-- What its inputs and outputs are
-- What edge cases it needs to handle
+All from repo root.
 
-Then wait for confirmation before writing the code.
+**Data prep (shared, one-time):**
+```bash
+python pipelines/extract.py     # unstructured hi_res + Gemini Vision for tables
+python pipelines/chunk.py       # sentence-window chunking, tables kept intact
+python pipelines/embed.py       # Qwen3-Embedding-8B → data/vector_store.db
 ```
 
-This pattern surfaces misunderstandings before implementation. On this project it
-was used for the multi-step pipeline orchestrator and the token spend logging design.
-For the orchestrator, the planning step revealed that the described flow implied
-the decomposer returned sub-questions as a flat list when the schema required them
-inserted as rows before retrieval began — the plan was corrected first, then
-implementation followed with the right insert sequence. For token spend logging, the
-plan revealed ambiguity about whether to log per-step token counts or only the run
-total; the decision to log both (steps table stores per-step counts, runs table
-stores the total) was made in the planning exchange, not discovered during debugging.
+**Run a pipeline:**
+```bash
+python pipelines/single_shot_rag.py --question "Q1" --model "Qwen/Qwen3-30B-A3B-Instruct-2507"
+python pipelines/multi_step_rag.py  --question "Q1" --model "Qwen/Qwen3-30B-A3B-Instruct-2507"
 
----
+# All 6 questions via orchestrator
+python pipelines/run_all.py --pipeline single_shot --model "Qwen/Qwen3-30B-A3B-Instruct-2507"
+# flags: --questions, --extra-args, --dry-run
+```
 
-## 6. What to watch for when using AI tools on this codebase
+**Retrieval-only eval (no generation calls):**
+```bash
+python pipelines/evaluate_retrieval.py      # Recall@k, MRR vs ground_truth.md
+```
 
-**1. Validate generated repo structures against the actual filesystem before
-accepting documentation.** AI generates structures from the prompt's implied
-architecture, not from what exists on disk. A file that was planned but never created
-will appear in generated documentation. Run a directory listing and compare it
-against any generated structure before committing.
+**Export runs:**
+```bash
+python pipelines/dump_runs.py               # db/benchmark.db → logs/runs.jsonl
+# flags: --pipeline, --model, --run-ids, --append (overwrites by default)
+```
 
-**2. When adding a new script, explicitly ask the AI to search for existing utility
-functions before implementing new ones.** Otherwise scripts will be kept
-self-contained at the cost of duplication. `stable_qid` is the current example;
-any new script that needs stable question IDs should import from the existing
-location rather than re-implement. The search instruction must be explicit — the AI
-will not infer that a utility function exists elsewhere unless told to look.
+**Evaluation workflow (in order; step 2 is manual):**
+```bash
+python evaluation/make_worksheet.py             # --force to overwrite
+# 2. human scores evaluation/scoring_worksheet.md
+python evaluation/make_faithfulness_sheet.py    # --run-ids optional
+python evaluation/load_evaluations.py           # --dry-run to preview; idempotent
+# 5. open evaluation/analysis.ipynb (figures → docs/images/)
+```
 
-**3. Cross-check any document that describes the technical stack against the actual
-codebase before committing.** Planning-stage descriptions — ChromaDB as the vector
-store, a local cross-encoder reranker — can persist into documentation long after
-the implementation diverged. DECISIONS.md is the authoritative record of what was
-adopted and what was dropped; generated documentation should be checked against it,
-not against earlier planning notes.
+**Inspect & diagnose (read-only):**
+```bash
+python evaluation/inspect_intermediate_answers.py --run-ids <id> [<id> ...]   # render sub-step Q/A/chunks
+python scripts/check_embeddings.py                                            # row counts, BLOB integrity
+```
+
+**Tests & lint (the "done" bar):**
+```bash
+pytest
+ruff check .
+ruff format --check .
+```
+CI runs all three (`.github/workflows/lint.yml`, `tests.yml`); a change is not done
+until they pass.
+
+## Repo layout
+
+```
+config.py                 # single source of truth: paths, constants, pricing
+utils.py                  # shared helpers: env loading, year extraction, JSONL I/O
+pyproject.toml            # ruff + pytest config
+
+pipelines/
+  extract.py  chunk.py  embed.py        # data prep
+  retrieval.py                          # shared: hybrid BM25+dense RRF, value-aware selection
+  single_shot_rag.py  multi_step_rag.py # the two pipelines
+  run_all.py  dump_runs.py  evaluate_retrieval.py
+
+db/
+  database.py             # SOLE SQLite touchpoint for benchmark.db
+  schema.sql              # 6 tables; benchmark.db created on first run (not committed)
+
+evaluation/               # ground_truth.md (frozen) + scoring/faithfulness scripts + analysis.ipynb
+scripts/                  # check_embeddings.py (diagnostic); migrate_qn_ids.py (DO NOT RUN)
+tests/                    # chunker, utils, schema — deterministic logic only
+docs/                     # report.md, case study, AI_USAGE.md; decomposition_research.md is stale
+data/                     # raw PDFs, extracted/chunked JSONL, vector_store.db  [do not read PDFs]
+logs/                     # runs.jsonl, token_spend.jsonl
+```
+
+## Conventions
+
+- **Style:** ruff (line-length 100, double quotes, py311). Type hints throughout;
+  imports at top of file, never inline. Use `logging`, not `print()`; `pathlib`, not
+  string path concatenation.
+- **Config:** all paths, constants, and pricing rates live in `config.py` — read and
+  add them there; never hardcode a path or magic number in a pipeline or script.
+- **Naming:** files `snake_case.py`; constants `UPPER_SNAKE_CASE` in `config.py`; chunk
+  IDs `<COMPANY>_<year>_chunk_<zero_padded_index>`; document labels `<COMPANY>_<year>`.
+- **Branches:** `feature/<desc>`, `docs/<desc>`, `chore/<desc>`.
+- **Commits:** conventional — `<type>: <short desc>` then body. Types: `feat`, `fix`,
+  `chore`, `docs`, `refactor`, `eval`.
+- **Tests cover deterministic logic only** (chunker, utils, schema). LLM/retrieval
+  quality is measured by benchmark runs, not unit tests — do not add brittle LLM-output
+  assertions.
+
+## Data & persistence
+
+Two separate SQLite DBs, do not conflate them:
+
+- **`data/vector_store.db`** — embedding store (`chunks` + `chunk_embeddings` BLOB,
+  4096-dim float32 via the `sqlite-vec` extension). Written by `embed.py`, read-only at
+  pipeline runtime via `retrieval.py`.
+- **`db/benchmark.db`** — run store (`questions`, `runs`, `decompositions`, `steps`,
+  `final_answers`, `evaluations`). **All SQLite access goes through `db/database.py`** —
+  never `import sqlite3` in a pipeline or evaluation file. Schema uses
+  `CREATE TABLE IF NOT EXISTS`, so re-running is safe.
+
+Data path patterns: `data/extracted/<company>/<company>_<year>_elements.jsonl`,
+`data/chunked/<company>/<company>_<year>_chunks.jsonl`. Companies: `DEWA`, `TNB`,
+`Centerpoint`.
+
+`logs/token_spend.jsonl` is the authoritative budget record (append-only, via
+`check_budget(phase_label)`). `logs/runs.jsonl` is the dumped run export.
+
+## Locked decisions — do not relitigate
+
+Settled in `DECISIONS.md`. Do not re-introduce removed components or re-argue these:
+
+| Decision | Locked value |
+|---|---|
+| Vector store | local **SQLite** (`sqlite-vec`), not ChromaDB or any hosted DB |
+| Reranking | **removed from scope** — no cross-encoder; keeps the NEBIUS-only compute model |
+| Decomposition | Least-to-Most, N+1 calls |
+| Retrieval | hybrid BM25+dense RRF; `BM25_WEIGHT=2`, `RRF_K=60`, `top_n=40`, `context_chunks=10` |
+| Context selection | three-pass value-aware |
+| Chunking | sentence-window, 2-sentence overlap, tables kept intact |
+| Table extraction | Gemini Vision (`gemini-2.5-flash`), 200 DPI, 30-page batches |
+| Boilerplate filter | implemented but `ENABLE_BOILERPLATE_FILTER = False` |
+| Embedding | `Qwen/Qwen3-Embedding-8B` via NEBIUS |
+| Ground truth | 6 questions, frozen — adding any breaks comparability |
+| Evaluation | manual human scoring (no LLM judge); correctness as k/n key claims |
+
+## Gotchas / do-not
+
+- **Never run `scripts/migrate_qn_ids.py`** — one-time repair already applied (commit
+  `ba48de4`); re-running corrupts question IDs.
+- **`stable_qid` is duplicated** across `single_shot_rag.py`, `multi_step_rag.py`, and
+  `scripts/migrate_qn_ids.py` (known tech debt). Import an existing copy; do not add a
+  fourth.
+- **Stale, not authoritative:** `docs/decomposition_research.md` and `CODEBASE_AUDIT.md`
+  describe earlier plans, not the current system.
+- **Benchmark subset:** `db/benchmark.db` holds more runs than the scored set. The
+  scored benchmark is exactly {single_shot, multi_step} × {30B, 235B} over the 6 GT
+  questions; unevaluated runs carry null score fields after `dump_runs.py`.
+- Other known limitations (assembly token counts on resume, table-count mismatch, etc.)
+  are catalogued in `CONTRIBUTING.md` — check there before "fixing" surprising behaviour.
