@@ -304,15 +304,8 @@ to the LtM choice. It is not documentation of the implemented system.
 |---|---|---|
 | `NEBIUS_API_KEY` | All embedding and generation calls | `your-nebius-key` |
 | `GEMINI_API_KEY` | PDF table extraction only; not needed if extraction is already complete | `your-gemini-key` |
-| `PDF_RASTERISE_DPI` | Extraction — DPI for PDF rasterisation before Gemini | `200` |
-| `GEMINI_BATCH_PAGE_LIMIT` | Extraction — max pages per Gemini API call | `30` |
-| `PDF_PARTITION_STRATEGY` | Extraction — unstructured partition strategy | `hi_res` |
-| `PDF_HI_RES_MODEL` | Extraction — layout model for hi_res | `yolox` |
 
-`NEBIUS_API_KEY` and `GEMINI_API_KEY` must be filled in manually. The remaining
-four variables control PDF extraction settings and are pre-filled in `.env.example`
-with tested defaults — only change them if you need to adjust extraction quality
-or batch behaviour.
+`NEBIUS_API_KEY` and `GEMINI_API_KEY` must be filled in manually. These are the only values that belong in `.env` — all other pipeline parameters are hardcoded constants in `config.py`.
 
 `.env` is gitignored and must never be committed. It contains credentials that would grant
 full NEBIUS and Gemini API access to anyone who obtains the file.
@@ -638,15 +631,8 @@ factual retrieval where retrieval coverage of a single company or year is suffic
 | `NEBIUS_API_KEY` | NEBIUS API authentication | — | Yes |
 | `GEMINI_API_KEY` | Gemini API authentication for table extraction | — | Only for `extract.py` |
 | `GENERATION_COST_PER_1M_TOKENS` | Fallback cost rate for model strings not in the pricing dict | `0.02` | No |
-| `PDF_DIR` | Root directory for source PDFs | `data/raw` | No |
-| `PDF_GLOB` | Glob pattern for PDF discovery within `PDF_DIR` | `**/*.pdf` | No |
-| `PDF_PARTITION_STRATEGY` | `unstructured` partition strategy | `hi_res` | No |
-| `PDF_HI_RES_MODEL` | Layout model used by hi_res | `yolox` | No |
-| `PDF_RASTERISE_DPI` | DPI for PDF rasterisation before Gemini | `200` | No |
-| `GEMINI_BATCH_PAGE_LIMIT` | Max pages per Gemini API call | `30` | No |
 
-All variables are read from `.env` at startup via `python-dotenv`. Variables with a non-blank
-default are optional — the pipeline uses the default if the variable is absent from `.env`.
+`NEBIUS_API_KEY` and `GEMINI_API_KEY` are the only variables that belong in `.env`. All other pipeline parameters are hardcoded constants — see the Key constants section in `CONTRIBUTING.md` to change them.
 
 ---
 
