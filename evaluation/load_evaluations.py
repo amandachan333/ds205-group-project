@@ -15,16 +15,13 @@ Usage (from repo root):
 
 import argparse
 import re
-import sys
 from pathlib import Path
+
+from db import database
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKSHEET = ROOT / "evaluation" / "scoring_worksheet.md"
 DB_PATH = ROOT / "db" / "benchmark.db"
-
-# import the existing DB layer rather than touching sqlite directly
-sys.path.insert(0, str(ROOT))
-from db import database  # noqa: E402
 
 
 def parse_answers_table(path: Path) -> list[dict]:

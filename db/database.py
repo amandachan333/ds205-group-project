@@ -12,6 +12,8 @@ import logging
 import sqlite3
 from pathlib import Path
 
+from config import BENCHMARK_DB_PATH
+
 logger = logging.getLogger(__name__)
 
 SCHEMA_PATH = Path(__file__).parent.parent / "db" / "schema.sql"
@@ -22,12 +24,12 @@ SCHEMA_PATH = Path(__file__).parent.parent / "db" / "schema.sql"
 # ---------------------------------------------------------------------------
 
 
-def get_connection(db_path: str = "db/benchmark.db") -> sqlite3.Connection:
+def get_connection(db_path: str | Path = BENCHMARK_DB_PATH) -> sqlite3.Connection:
     """
-    Open a connection to the SQLite database.
+    Open a connection to the SQLite benchmark database.
     Sets row_factory so rows are accessible by column name.
     """
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

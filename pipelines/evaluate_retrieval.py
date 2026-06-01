@@ -56,9 +56,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from retrieval import (
+from config import LOG_DIR, VECTOR_STORE_PATH
+from pipelines.retrieval import (
     BM25_WEIGHT,
     RRF_K,
     get_corpus_inventory,
@@ -67,8 +66,6 @@ from retrieval import (
     make_client,
     select_context_chunks,
 )
-
-from config import DB_PATH, LOG_DIR
 from utils import bootstrap_runtime_env, ensure_stage_dirs
 
 bootstrap_runtime_env()
@@ -359,7 +356,9 @@ def main() -> None:
         description="Evaluate retrieval quality against ground-truth chunk_ids. No LLM generation.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to vector_store.db.")
+    parser.add_argument(
+        "--db", type=Path, default=VECTOR_STORE_PATH, help="Path to vector_store.db."
+    )
     parser.add_argument(
         "--top-n",
         type=int,

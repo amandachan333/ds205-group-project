@@ -18,9 +18,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# Project root on sys.path so we can import config
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-DB_PATH = Path("db/benchmark.db")
+from config import BENCHMARK_DB_PATH as DB_PATH
 
 
 def fetch(run_ids: list[int]) -> list[sqlite3.Row]:

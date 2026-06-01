@@ -20,15 +20,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import logging
-import os
-import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import numpy as np
-from retrieval import (
+
+from config import DB_PATH, LOG_DIR
+from config import RAG_GENERATION_MODEL as DEFAULT_MODEL
+from db import database
+from pipelines.retrieval import (
     BM25_WEIGHT,
     RRF_K,
     check_budget,
@@ -41,9 +41,6 @@ from retrieval import (
     select_context_chunks,
     summarise_chunks_for_step,
 )
-
-from config import DB_PATH, LOG_DIR
-from db import database as database
 from utils import bootstrap_runtime_env, ensure_stage_dirs
 
 bootstrap_runtime_env()
@@ -64,7 +61,6 @@ DEFAULT_TOP_N = 40
 DEFAULT_CONTEXT_CHUNKS = 10
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
-DEFAULT_MODEL = os.environ.get("RAG_GENERATION_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507")
 
 SINGLE_SHOT_SYSTEM_PROMPT = (
     "You are an expert analyst specialising in corporate carbon performance and emissions reporting. "

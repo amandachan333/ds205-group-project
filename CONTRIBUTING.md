@@ -202,11 +202,7 @@ the sqlite-vec extension. The embed pipeline does not use sqlite-vec virtual tab
 no-op is functionally harmless — but it misleads any developer who searches for sqlite-vec
 usage. Proposed fix: remove the no-op function from `embed.py` entirely.
 
-**Token budget:** total embed cost is tracked in `logs/token_spend.jsonl`. The pipeline's
-`check_budget()` function (called from `retrieval.py`) sums `cost_usd` across all record
-types and warns to stderr when cumulative spend reaches 90% of the `TOKEN_BUDGET_USD`
-environment variable (default $100.0). Embedding the full corpus cost $0.0393 in our
-benchmark run.
+**Token budget:** total embed cost is tracked in `logs/token_spend.jsonl`. The pipeline's `check_budget()` function (called from `retrieval.py`) sums `cost_usd` across all record types and warns to stderr when cumulative spend reaches 90% of the `TOKEN_BUDGET_USD` (set to $100.0 in `config.py`). Embedding the full corpus cost $0.0409 in the most recent embedding run.
 
 ---
 

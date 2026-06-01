@@ -27,17 +27,18 @@ import argparse
 import hashlib
 import json
 import logging
-import os
 import re
 import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from retrieval import (
+from config import DB_PATH, LOG_DIR
+from config import RAG_GENERATION_MODEL as DEFAULT_MODEL
+from db import database
+from pipelines.retrieval import (
     BM25_WEIGHT,
     RRF_K,
+    calculate_generation_cost,
     check_budget,
     format_context,
     get_corpus_inventory,
@@ -48,9 +49,6 @@ from retrieval import (
     select_context_chunks,
     summarise_chunks_for_step,
 )
-
-from config import DB_PATH, LOG_DIR
-from db import database as database
 from utils import bootstrap_runtime_env, ensure_stage_dirs
 
 bootstrap_runtime_env()
@@ -70,7 +68,6 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = os.environ.get("RAG_GENERATION_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507")
 DEFAULT_TOP_N = 40
 DEFAULT_CONTEXT_CHUNKS = 10
 DEFAULT_TEMPERATURE = 0.0
@@ -721,7 +718,6 @@ def run_pipeline(
     # token_spend.jsonl but not counted in runs.total_tokens. This is a known
     # gap; for our 6-question benchmark, assembly is typically ~1-3k tokens
     # and runs almost always complete in one process.)
-    from retrieval import calculate_generation_cost
 
     decomp_row = database.get_decomposition(conn, run_id)
     completed = list(database.get_completed_steps(conn, run_id))
