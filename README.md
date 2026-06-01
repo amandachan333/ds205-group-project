@@ -269,7 +269,7 @@ to the LtM choice. It is not documentation of the implemented system.
    used to call NEBIUS.
 
    ```bash
-   conda env create -f environment.yml
+   conda env create -f environment_windows.yml
    conda activate tpi-rag
    ```
 
@@ -291,13 +291,19 @@ to the LtM choice. It is not documentation of the implemented system.
 
 ### Setting up your .env file
 
-| Variable | Required for | Example / default |
+| Variable | Required for | Value |
 |---|---|---|
-| `NEBIUS_API_KEY` | Embedding and all generation calls | `your-nebius-key` |
-| `NEBIUS_BASE_URL` | NEBIUS API endpoint | `https://api.studio.nebius.com/v1/` |
-| `GEMINI_API_KEY` | PDF table extraction (`pipelines/extract.py`) only | `your-gemini-key` |
-| `RAG_GENERATION_MODEL` | Override the default generation model | `Qwen/Qwen3-30B-A3B-Instruct-2507` |
-| `TOKEN_BUDGET_USD` | Budget cap; pipeline warns at 90% of this value | `100.0` |
+| `NEBIUS_API_KEY` | All embedding and generation calls | `your-nebius-key` |
+| `GEMINI_API_KEY` | PDF table extraction only; not needed if extraction is already complete | `your-gemini-key` |
+| `PDF_RASTERISE_DPI` | Extraction — DPI for PDF rasterisation before Gemini | `200` |
+| `GEMINI_BATCH_PAGE_LIMIT` | Extraction — max pages per Gemini API call | `30` |
+| `PDF_PARTITION_STRATEGY` | Extraction — unstructured partition strategy | `hi_res` |
+| `PDF_HI_RES_MODEL` | Extraction — layout model for hi_res | `yolox` |
+
+`NEBIUS_API_KEY` and `GEMINI_API_KEY` must be filled in manually. The remaining
+four variables control PDF extraction settings and are pre-filled in `.env.example`
+with tested defaults — only change them if you need to adjust extraction quality
+or batch behaviour.
 
 `.env` is gitignored and must never be committed. It contains credentials that would grant
 full NEBIUS and Gemini API access to anyone who obtains the file.
@@ -621,10 +627,7 @@ factual retrieval where retrieval coverage of a single company or year is suffic
 | Variable | Description | Default | Required |
 |---|---|---|---|
 | `NEBIUS_API_KEY` | NEBIUS API authentication | — | Yes |
-| `NEBIUS_BASE_URL` | NEBIUS API endpoint | `https://api.studio.nebius.com/v1/` | No |
 | `GEMINI_API_KEY` | Gemini API authentication for table extraction | — | Only for `extract.py` |
-| `RAG_GENERATION_MODEL` | Default generation model for both pipelines | `Qwen/Qwen3-30B-A3B-Instruct-2507` | No |
-| `TOKEN_BUDGET_USD` | Total budget cap; `check_budget()` warns at 90% | `100.0` | No |
 | `GENERATION_COST_PER_1M_TOKENS` | Fallback cost rate for model strings not in the pricing dict | `0.02` | No |
 | `PDF_DIR` | Root directory for source PDFs | `data/raw` | No |
 | `PDF_GLOB` | Glob pattern for PDF discovery within `PDF_DIR` | `**/*.pdf` | No |
@@ -651,7 +654,6 @@ default are optional — the pipeline uses the default if the variable is absent
 - `evaluation/ground_truth.md` — the frozen benchmark question set and expected answers
 - `evaluation/scoring_worksheet.md` — completed human-scored worksheet
 - `evaluation/faithfulness_all.md` — completed faithfulness sheet
-- `DECISIONS_EXTRACTED.md` — factual record of architectural decisions and post-hoc rationale
 - `db/schema.sql` — canonical database schema
 
 **Sharing the vector store:** `data/vector_store.db` is gitignored. A teammate can share it
