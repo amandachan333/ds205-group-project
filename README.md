@@ -561,7 +561,7 @@ inspectability examples (Runs 57 and 53). Figures are saved to `docs/images/`.
 
 | Item | Cost | Tokens |
 |---|---|---|
-| Embedding — Qwen3-Embedding-8B | $0.0393 | 3,926,175 tokens |
+| Embedding — Qwen3-Embedding-8B | $0.0817 | 3,926,175 tokens |
 | Generation — Qwen3-30B | $0.1771 | 433 calls; 1.54M prompt + 76K completion |
 | Generation — Qwen3-235B | $0.0924 | 126 calls; 395K prompt + 22K completion |
 | Retrieval eval queries | $0.0001 | — |
