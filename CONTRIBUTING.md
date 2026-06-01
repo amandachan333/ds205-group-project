@@ -784,17 +784,3 @@ The script has already been applied (commit `ba48de4`). Running it again would c
 database by applying the ID transformation a second time. Proposed fix: add a prominent
 warning comment at the top of the script — `# THIS SCRIPT HAS ALREADY BEEN APPLIED (commit
 ba48de4). DO NOT RUN AGAIN.` — so that a future maintainer does not accidentally invoke it.
-
----
-
-**`extract.py` does not use `config.RAW_DIR`**
-What it is: `extract.py` hardcodes `Path("data/raw")` as a literal rather than importing `RAW_DIR` from `config.py`. All other pipeline scripts use `config.py` constants for directory paths, making `extract.py` inconsistent with the established pattern.
-Where it manifests: `pipelines/extract.py` lines 418 and 505.
-Proposed fix: replace the hardcoded literal with `from config import RAW_DIR` and use it as the default argument in `run_extraction()` and the `__main__` block.
-
----
-
-**`resolve_pdf_workflow_config()` is dead code (`utils.py`)**
-What it is: `utils.py` defines a function that reads `PDF_DIR` and `PDF_GLOB` from the environment to discover source PDFs. The function is never called by any pipeline script — `extract.py` discovers PDFs independently using a hardcoded path. The error message in line 42 ("Check PDF_DIR and PDF_GLOB in your .env file") will therefore never appear, and the two env vars have no effect on any pipeline run.
-Where it manifests: `utils.py` lines 25–47.
-Proposed fix: remove `resolve_pdf_workflow_config()` entirely, or wire it into `extract.py` to centralise PDF discovery and eliminate the hardcoded literal.
