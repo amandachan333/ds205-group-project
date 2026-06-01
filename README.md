@@ -11,6 +11,8 @@ Qwen3-235B via NEBIUS; the second decomposes each question into ordered sub-ques
 them sequentially using Least-to-Most prompting, and assembles a final response — trading
 compute cost for measurably higher correctness on complex multi-company questions.
 
+The **final report dictating our overall findings and recommendations** can be found [here](docs/report.md).
+
 ---
 
 ## What These Pipelines Do
