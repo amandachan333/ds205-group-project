@@ -269,7 +269,7 @@ to the LtM choice. It is not documentation of the implemented system.
    used to call NEBIUS.
 
    ```bash
-   conda env create -f environment.yml
+   conda env create -f environment_windows.yml
    conda activate tpi-rag
    ```
 
