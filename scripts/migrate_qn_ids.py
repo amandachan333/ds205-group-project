@@ -1,9 +1,11 @@
 import hashlib
 import sqlite3
 
+
 def stable_qid(text: str) -> str:
     norm = " ".join(text.split()).lower()
     return hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
+
 
 conn = sqlite3.connect("db/benchmark.db")
 conn.row_factory = sqlite3.Row

@@ -28,6 +28,7 @@ Usage
 Failures don't abort the run - other questions continue. A summary at the end
 lists which question_ids failed. Exit code is non-zero iff any question failed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -71,19 +72,31 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--pipeline", required=True, choices=["single_shot", "multi_step"],
+        "--pipeline",
+        required=True,
+        choices=["single_shot", "multi_step"],
         help="Which pipeline to invoke.",
     )
-    parser.add_argument("--model", default=None,
-                        help="Generation model name (passed through to the pipeline).")
-    parser.add_argument("--questions", default=None,
-                        help="Comma-separated qids to run (e.g., 'Q1,Q3,Q5'). Default: all.")
-    parser.add_argument("--ground-truth", type=Path, default=GROUND_TRUTH_MD,
-                        help="Path to ground_truth.md.")
-    parser.add_argument("--extra-args", type=str, default="",
-                        help="Extra args to pass to the pipeline (shell-quoted).")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print the commands without executing them.")
+    parser.add_argument(
+        "--model", default=None, help="Generation model name (passed through to the pipeline)."
+    )
+    parser.add_argument(
+        "--questions",
+        default=None,
+        help="Comma-separated qids to run (e.g., 'Q1,Q3,Q5'). Default: all.",
+    )
+    parser.add_argument(
+        "--ground-truth", type=Path, default=GROUND_TRUTH_MD, help="Path to ground_truth.md."
+    )
+    parser.add_argument(
+        "--extra-args",
+        type=str,
+        default="",
+        help="Extra args to pass to the pipeline (shell-quoted).",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print the commands without executing them."
+    )
     args = parser.parse_args()
 
     questions = parse_questions(args.ground_truth)
@@ -139,7 +152,9 @@ def main() -> None:
     total_elapsed = time.time() - total_start
 
     print("=" * 70)
-    print(f"  Done in {total_elapsed:.1f}s.  {len(questions) - len(failures)}/{len(questions)} succeeded.")
+    print(
+        f"  Done in {total_elapsed:.1f}s.  {len(questions) - len(failures)}/{len(questions)} succeeded."
+    )
     if failures:
         print(f"  Failures: {', '.join(f'{qid}(exit {rc})' for qid, rc in failures)}")
     print("=" * 70)

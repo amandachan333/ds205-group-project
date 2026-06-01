@@ -24,20 +24,16 @@ phrasing (one shot vs decomposed).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
 import re
 import sys
 import time
-import hashlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from config import DB_PATH, LOG_DIR
-from db import database as database
-from utils import bootstrap_runtime_env, ensure_stage_dirs
 
 from retrieval import (
     BM25_WEIGHT,
@@ -52,6 +48,10 @@ from retrieval import (
     select_context_chunks,
     summarise_chunks_for_step,
 )
+
+from config import DB_PATH, LOG_DIR
+from db import database as database
+from utils import bootstrap_runtime_env, ensure_stage_dirs
 
 bootstrap_runtime_env()
 ensure_stage_dirs(LOG_DIR)
@@ -245,15 +245,18 @@ Established findings:
 {findings}
 """
 
-# Stable question id helper 
+
+# Stable question id helper
 def stable_qid(question_text: str) -> str:
     """Deterministic question id derived from normalized text."""
     norm = " ".join(question_text.split()).lower()
     return hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
 
+
 # ---------------------------------------------------------------------------
 # LLM call wrapper
 # ---------------------------------------------------------------------------
+
 
 def _chat(
     client,
@@ -308,6 +311,7 @@ def parse_sub_questions(raw: str) -> list[str]:
 # Prompt-block formatters
 # ---------------------------------------------------------------------------
 
+
 def _format_established_facts(completed_steps: list) -> str:
     """Render completed sub-question answers as the 'previously established facts' block."""
     if not completed_steps:
@@ -333,6 +337,7 @@ def _format_findings(completed_steps: list) -> str:
 # ---------------------------------------------------------------------------
 # Phase 1: decomposition
 # ---------------------------------------------------------------------------
+
 
 def run_decomposition(
     *,
@@ -447,6 +452,7 @@ def review_sub_questions(sub_qs: list[str]) -> list[str] | None:
 # Phase 2: sub-question answering
 # ---------------------------------------------------------------------------
 
+
 def answer_sub_question(
     *,
     conn,
@@ -529,6 +535,7 @@ def answer_sub_question(
 # Phase 3: assembly
 # ---------------------------------------------------------------------------
 
+
 def assemble_final_answer(
     *,
     conn,
@@ -542,7 +549,9 @@ def assemble_final_answer(
     max_output_tokens: int,
 ) -> tuple[str, int, int]:
     """Run the assembly call, persist the final answer. Returns (answer, p_tok, c_tok)."""
-    log.info("[run %d] Assembling final answer from %d sub-answers ...", run_id, len(completed_steps))
+    log.info(
+        "[run %d] Assembling final answer from %d sub-answers ...", run_id, len(completed_steps)
+    )
     findings = _format_findings(completed_steps)
     user_prompt = ASSEMBLY_USER_PROMPT.format(
         original_question=original_question,
@@ -571,6 +580,7 @@ def assemble_final_answer(
 # ---------------------------------------------------------------------------
 # Pipeline orchestration
 # ---------------------------------------------------------------------------
+
 
 def run_pipeline(
     *,
@@ -656,11 +666,14 @@ def run_pipeline(
         sub_qs = sub_qs_existing
         log.info(
             "[run %d] Resuming with %d sub-questions already in DB",
-            run_id, len(sub_qs),
+            run_id,
+            len(sub_qs),
         )
 
     if args.dry_run:
-        log.info("[run %d] Dry run - decomposition complete, stopping before sub-question loop.", run_id)
+        log.info(
+            "[run %d] Dry run - decomposition complete, stopping before sub-question loop.", run_id
+        )
         check_budget("multi_step")
         return
 
@@ -747,14 +760,19 @@ def run_pipeline(
     check_budget("multi_step")
     log.info(
         "[run %d] Multi-step complete | %.2fs | %d prompt + %d completion = %d tokens | $%.4f",
-        run_id, latency_seconds, grand_prompt, grand_completion,
-        grand_prompt + grand_completion, total_cost,
+        run_id,
+        latency_seconds,
+        grand_prompt,
+        grand_completion,
+        grand_prompt + grand_completion,
+        total_cost,
     )
 
 
 # ---------------------------------------------------------------------------
 # Resume support
 # ---------------------------------------------------------------------------
+
 
 def prepare_resume(conn, resume_run_id: int) -> tuple[int, str, str, int, list[str] | None]:
     """
@@ -769,7 +787,9 @@ def prepare_resume(conn, resume_run_id: int) -> tuple[int, str, str, int, list[s
     if run is None:
         sys.exit(f"Run {resume_run_id} not found.")
     if run["pipeline_type"] != PIPELINE_TYPE:
-        sys.exit(f"Run {resume_run_id} is pipeline_type={run['pipeline_type']!r}, not 'multi_step'.")
+        sys.exit(
+            f"Run {resume_run_id} is pipeline_type={run['pipeline_type']!r}, not 'multi_step'."
+        )
     if run["status"] == "complete":
         sys.exit(f"Run {resume_run_id} is already complete.")
     if run["status"] == "failed":
@@ -812,26 +832,83 @@ def prepare_resume(conn, resume_run_id: int) -> tuple[int, str, str, int, list[s
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run a multi-step (Least-to-Most) RAG answer over the existing vector store.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--db", type=Path, default=DB_PATH, help="Path to vector_store.db produced by embed.py.")
-    parser.add_argument("--question", type=str, default=None, help="Question to answer (required unless --resume is given).")
-    parser.add_argument("--resume", type=int, default=None, help="Resume an existing multi-step run by its run_id.")
-    parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help="Nebius generation model name.")
-    parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N, help="Number of chunks to retrieve per sub-question.")
-    parser.add_argument("--context-chunks", type=int, default=DEFAULT_CONTEXT_CHUNKS, help="Number of retrieved chunks placed in each sub-question prompt.")
-    parser.add_argument("--bm25-weight", type=int, default=BM25_WEIGHT, help="Relative BM25 weight in RRF fusion.")
+    parser.add_argument(
+        "--db", type=Path, default=DB_PATH, help="Path to vector_store.db produced by embed.py."
+    )
+    parser.add_argument(
+        "--question",
+        type=str,
+        default=None,
+        help="Question to answer (required unless --resume is given).",
+    )
+    parser.add_argument(
+        "--resume", type=int, default=None, help="Resume an existing multi-step run by its run_id."
+    )
+    parser.add_argument(
+        "--model", type=str, default=DEFAULT_MODEL, help="Nebius generation model name."
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=DEFAULT_TOP_N,
+        help="Number of chunks to retrieve per sub-question.",
+    )
+    parser.add_argument(
+        "--context-chunks",
+        type=int,
+        default=DEFAULT_CONTEXT_CHUNKS,
+        help="Number of retrieved chunks placed in each sub-question prompt.",
+    )
+    parser.add_argument(
+        "--bm25-weight", type=int, default=BM25_WEIGHT, help="Relative BM25 weight in RRF fusion."
+    )
     parser.add_argument("--rrf-k", type=int, default=RRF_K, help="Reciprocal rank fusion constant.")
-    parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE, help="Sampling temperature for all calls.")
-    parser.add_argument("--max-output-tokens-decomp", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS_DECOMP, help="Max output tokens for the decomposition call.")
-    parser.add_argument("--max-output-tokens-sub", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS_SUB, help="Max output tokens for each sub-question call.")
-    parser.add_argument("--max-output-tokens-assembly", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS_ASSEMBLY, help="Max output tokens for the assembly call.")
-    parser.add_argument("--max-chars-per-chunk", type=int, default=DEFAULT_MAX_CHARS_PER_CHUNK, help="Truncate each chunk to this many characters before prompting.")
-    parser.add_argument("--review", action="store_true", help="Pause after decomposition for human review/edit of sub-questions.")
-    parser.add_argument("--dry-run", action="store_true", help="Run decomposition only; do not loop sub-questions or assemble.")
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=DEFAULT_TEMPERATURE,
+        help="Sampling temperature for all calls.",
+    )
+    parser.add_argument(
+        "--max-output-tokens-decomp",
+        type=int,
+        default=DEFAULT_MAX_OUTPUT_TOKENS_DECOMP,
+        help="Max output tokens for the decomposition call.",
+    )
+    parser.add_argument(
+        "--max-output-tokens-sub",
+        type=int,
+        default=DEFAULT_MAX_OUTPUT_TOKENS_SUB,
+        help="Max output tokens for each sub-question call.",
+    )
+    parser.add_argument(
+        "--max-output-tokens-assembly",
+        type=int,
+        default=DEFAULT_MAX_OUTPUT_TOKENS_ASSEMBLY,
+        help="Max output tokens for the assembly call.",
+    )
+    parser.add_argument(
+        "--max-chars-per-chunk",
+        type=int,
+        default=DEFAULT_MAX_CHARS_PER_CHUNK,
+        help="Truncate each chunk to this many characters before prompting.",
+    )
+    parser.add_argument(
+        "--review",
+        action="store_true",
+        help="Pause after decomposition for human review/edit of sub-questions.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run decomposition only; do not loop sub-questions or assemble.",
+    )
     parser.add_argument("--verbose", action="store_true", help="Verbose logging (DEBUG level).")
     args = parser.parse_args()
 
@@ -858,7 +935,9 @@ def main() -> None:
         database.init_db(conn)
 
         if args.resume is not None:
-            run_id, question_id, question_text, decomp_id, sub_qs = prepare_resume(conn, args.resume)
+            run_id, question_id, question_text, decomp_id, sub_qs = prepare_resume(
+                conn, args.resume
+            )
             log.info("[run %d] Resuming multi-step pipeline.", run_id)
         else:
             question_id = stable_qid(args.question)
@@ -883,7 +962,9 @@ def main() -> None:
                 sub_qs_existing=sub_qs,
             )
         except Exception:
-            log.exception("[run %d] Unhandled error; leaving run in 'running' state for resume.", run_id)
+            log.exception(
+                "[run %d] Unhandled error; leaving run in 'running' state for resume.", run_id
+            )
             raise
     finally:
         conn.close()

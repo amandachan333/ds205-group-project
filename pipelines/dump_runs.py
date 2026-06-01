@@ -25,8 +25,14 @@ Output schema (one JSON object per line):
     n_sub_questions         int      0 for single_shot, N for multi_step
     sub_questions           list     decomposition (empty for single_shot)
     selected_chunk_ids      list     union of chunks that reached the LLM
-    selected_pages          list     page numbers, aligned with chunk_ids
+    selected_pages          list     page nsumbers, aligned with chunk_ids
     selected_document_labels list    document labels, aligned with chunk_ids
+    correctness             str|null fraction of key claims correct, e.g. "3/5"
+                                     (null for unscored runs); compare WITHIN a
+                                     question only, never averaged across questions
+    faithfulness_score      str|null (supported + corpus-error)/total claims as a
+                                     fraction (null for unscored runs)
+    evaluator_notes         str|null verdict tag + free-text notes (null if unscored)
     step_chunks             list     multi_step only: per-step chunk breakdown
                                      [{step_index, chunk_id, page_number, document_label}, ...]
 
@@ -47,6 +53,7 @@ Usage
     # Custom output path
     python pipelines/dump_runs.py --output benchmark_v2.jsonl
 """
+
 from __future__ import annotations
 
 import argparse
@@ -131,13 +138,40 @@ def get_run_step_chunks(conn: sqlite3.Connection, run_id: int) -> list[dict]:
         except json.JSONDecodeError:
             continue
         for c in chunks:
-            chunk_summary.append({
-                "step_index": r["step_index"],
-                "chunk_id": c.get("chunk_id"),
-                "page_number": c.get("page_number"),
-                "document_label": c.get("document_label"),
-            })
+            chunk_summary.append(
+                {
+                    "step_index": r["step_index"],
+                    "chunk_id": c.get("chunk_id"),
+                    "page_number": c.get("page_number"),
+                    "document_label": c.get("document_label"),
+                }
+            )
     return chunk_summary
+
+
+def get_run_evaluation(conn: sqlite3.Connection, run_id: int) -> dict:
+    """Return the manual evaluation for a run, or null fields if unscored.
+
+    The evaluations table holds the 24 manually-scored benchmark runs.
+    Any run without a matching row (e.g. the dev-iteration runs) gets
+    None fields — i.e. LEFT-JOIN semantics, not an inner join that would
+    silently drop unscored runs.
+    """
+    row = conn.execute(
+        """
+        SELECT correctness, faithfulness_score, evaluator_notes
+        FROM evaluations
+        WHERE run_id = ?
+        """,
+        (run_id,),
+    ).fetchone()
+    if not row:
+        return {"correctness": None, "faithfulness_score": None, "evaluator_notes": None}
+    return {
+        "correctness": row["correctness"],
+        "faithfulness_score": row["faithfulness_score"],
+        "evaluator_notes": row["evaluator_notes"],
+    }
 
 
 def build_record(conn: sqlite3.Connection, run: sqlite3.Row) -> dict:
@@ -174,6 +208,10 @@ def build_record(conn: sqlite3.Connection, run: sqlite3.Row) -> dict:
         "selected_document_labels": [],
     }
 
+    # Manual evaluation scores LEFT-JOINed from the evaluations table.
+    # Unscored runs carry null fields rather than being dropped.
+    record.update(get_run_evaluation(conn, run["run_id"]))
+
     # Sub-questions only exist for multi_step (decompositions table).
     if run["pipeline_type"] == "multi_step":
         sub_qs = get_run_sub_questions(conn, run["run_id"])
@@ -199,20 +237,35 @@ def main() -> None:
         description="Dump completed runs from benchmark.db to JSONL.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--db", type=Path, default=DEFAULT_DB,
-                        help="Path to the benchmark SQLite database.")
-    parser.add_argument("--output", "-o", type=Path, default=DEFAULT_OUTPUT,
-                        help="Output JSONL path.")
-    parser.add_argument("--append", action="store_true",
-                        help="Append to output instead of overwriting.")
-    parser.add_argument("--pipeline", choices=["single_shot", "multi_step"], default=None,
-                        help="Only dump runs from one pipeline.")
-    parser.add_argument("--model", type=str, default=None,
-                        help="Only dump runs from one model (exact match).")
-    parser.add_argument("--run-ids", type=str, default=None,
-                        help="Comma-separated run_ids to include (otherwise all).")
-    parser.add_argument("--include-incomplete", action="store_true",
-                        help="Include runs with status != 'complete' (failed, running).")
+    parser.add_argument(
+        "--db", type=Path, default=DEFAULT_DB, help="Path to the benchmark SQLite database."
+    )
+    parser.add_argument(
+        "--output", "-o", type=Path, default=DEFAULT_OUTPUT, help="Output JSONL path."
+    )
+    parser.add_argument(
+        "--append", action="store_true", help="Append to output instead of overwriting."
+    )
+    parser.add_argument(
+        "--pipeline",
+        choices=["single_shot", "multi_step"],
+        default=None,
+        help="Only dump runs from one pipeline.",
+    )
+    parser.add_argument(
+        "--model", type=str, default=None, help="Only dump runs from one model (exact match)."
+    )
+    parser.add_argument(
+        "--run-ids",
+        type=str,
+        default=None,
+        help="Comma-separated run_ids to include (otherwise all).",
+    )
+    parser.add_argument(
+        "--include-incomplete",
+        action="store_true",
+        help="Include runs with status != 'complete' (failed, running).",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")

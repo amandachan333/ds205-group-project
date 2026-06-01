@@ -1,0 +1,43 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "data",
+    "logs",
+    "reports",
+    "notebooks",
+    ".venv",
+    "*.ipynb",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (unused imports, undefined names — catches real bugs)
+    "I",   # isort (consistent import ordering)
+    "UP",  # pyupgrade (modernise to py3.11 idioms)
+    "B",   # flake8-bugbear (common bug patterns)
+]
+ignore = [
+    "E501",  # line-too-long — let the formatter handle this
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+# Discover tests under tests/. Standard naming: test_*.py / test_*.
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+# -ra: short summary of failures at the end of the run
+# -q : quieter per-test output (dots instead of names)
+addopts = "-ra -q"
+
+# Silence pytest's deprecation chatter from third-party libs
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]

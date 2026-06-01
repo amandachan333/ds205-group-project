@@ -8,6 +8,7 @@ dependencies:
   - pillow
   - tesseract
   - libmagic
+  - ipykernel
   - pip:
       - python-dotenv
       - google-genai
@@ -21,3 +22,5 @@ dependencies:
       - sqlite-vec
       - rank-bm25 
       - numpy 
+      - ruff>=0.7,<1.0
+      - pytest
