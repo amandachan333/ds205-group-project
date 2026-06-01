@@ -121,6 +121,14 @@ Full ground-truth answers with source page numbers and chunk IDs are in
 
 ```
 repo/
+├── .github/
+│   └── workflows/
+│       ├── lint.yml                   # CI: ruff check + ruff format --check on push and PR;
+│       │                              #   fails the build if any file would be reformatted or
+│       │                              #   any lint rule fires
+│       └── tests.yml                  # CI: pytest on push and PR; runs the suite under
+│                                      #   tests/ against the conda environment
+│
 ├── config.py                          # all constants: paths, chunking params, embedding model,
 │                                      #   NEBIUS pricing rates, base URL — single source of truth
 ├── utils.py                           # shared helpers: .env loading, directory creation, year
@@ -147,11 +155,22 @@ repo/
 │   └── dump_runs.py                   # reads db/benchmark.db and exports completed runs to
 │                                      #   logs/runs.jsonl in a symmetric schema for both pipelines
 │
+├── tests/
+│   ├── conftest.py                    # shared pytest fixtures: in-memory SQLite with schema.sql
+│   │                                  #   applied, sample chunk records, temp working directory
+│   ├── test_chunker.py                # tests for chunk.py: table-aware splitting, pipe-delimited
+│   │                                  #   row preservation, tCO,e normalisation, boilerplate detection
+│   └── test_utils.py                  # tests for utils.py: year derivation from filenames,
+│                                      #   atomic JSONL read/write round-trip
+│
 ├── db/
 │   ├── schema.sql                     # canonical CREATE TABLE definitions; executed once at startup
 │   ├── database.py                    # every SQLite read/write function for db/benchmark.db;
 │   │                                  #   the only file that imports sqlite3 for the benchmark store
-│   └── __init__.py                    # empty package marker
+│   └── benchmark.db                   # benchmark results: runs, steps, decompositions,
+│                                      #   final_answers, evaluations; gitignored; created automatically
+│                                      #   by database.init_db() on first pipeline call; separate
+│                                      #   database from data/vector_store.db
 │
 ├── evaluation/                        # scoring aids — not pipeline stages
 │   ├── ground_truth.md                # six benchmark questions with expected answers, source
@@ -181,20 +200,15 @@ repo/
 │                                      #   stable SHA-1 hash IDs; bypassed FK constraints during run;
 │                                      #   already applied (commit ba48de4); MUST NOT BE RUN AGAIN
 │
-├── data/                              # gitignored entirely
-│   ├── raw/                           # source PDFs organised by company
+├── data/
+│   ├── raw/                           # source PDFs organised by company; gitignored
 │   ├── extracted/                     # per-document JSONL from extract.py
 │   ├── chunked/                       # per-document JSONL from chunk.py
 │   └── vector_store.db                # vector store: chunk text + float32 BLOB embeddings;
-│                                      #   created by embed.py; separate database from benchmark.db
+│                                      #   created by embed.py; separate database from benchmark.db;
+│                                      #   gitignored
 │
-├── db/
-│   └── benchmark.db                   # benchmark results: runs, steps, decompositions,
-│                                      #   final_answers, evaluations; gitignored; created automatically
-│                                      #   by database.init_db() on first pipeline call; separate
-│                                      #   database from data/vector_store.db
-│
-├── logs/                              # gitignored
+├── logs/
 │   ├── token_spend.jsonl              # append-only JSONL: one record per embedding batch, per
 │   │                                  #   generation call, per retrieval eval query; used for
 │   │                                  #   budget accounting and cost analysis; not a database table
@@ -203,7 +217,9 @@ repo/
 │
 ├── DECISIONS.md                       # architectural decision log
 ├── CONTRIBUTING.md                    # developer guide
-├── environment.yml                    # conda environment for local development
+├── pyproject.toml                     # tool config: ruff (lint + format) and pytest;
+│                                      #   single config file for all tooling
+├── environment_windows.yml            # conda environment for local development (Windows)
 ├── environment_nuvolos.yml            # conda environment for Nuvolos (Linux; uses libmagic
 │                                      #   instead of python-magic-bin)
 └── .env.example                       # template for required API keys
