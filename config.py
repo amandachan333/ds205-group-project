@@ -30,6 +30,14 @@ MIN_CHUNK_LENGTH: int = 100  # merge chunks shorter than this (chars)
 MAX_CHUNK_LENGTH: int = 2_000  # hard-split threshold (chars)
 
 # ---------------------------------------------------------------------------
+# PDF extraction  (used by pipelines/extract.py)
+# ---------------------------------------------------------------------------
+PDF_RASTERISE_DPI: int = 200  # higher = better tables, larger payloads
+GEMINI_BATCH_PAGE_LIMIT: int = 30  # pages per Gemini API call
+PDF_PARTITION_STRATEGY: str = "hi_res"
+PDF_HI_RES_MODEL: str = "yolox"
+
+# ---------------------------------------------------------------------------
 # Embedding
 # ---------------------------------------------------------------------------
 EMBEDDING_MODEL: str = "Qwen/Qwen3-Embedding-8B"
