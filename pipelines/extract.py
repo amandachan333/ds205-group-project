@@ -50,6 +50,7 @@ from PIL import Image
 from unstructured.partition.pdf import partition_pdf
 
 import config
+from config import RAW_DIR
 from utils import derive_year, save_jsonl_atomic
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -415,7 +416,7 @@ def _extracted_years(extracted_company_dir: Path) -> set[int]:
 
 
 def run_extraction(
-    raw_dir: Path | str = Path("data/raw"),
+    raw_dir: Path | str = RAW_DIR,
     extracted_dir: Path | str = Path("data/extracted"),
     company: str | None = None,
     force: bool = False,
@@ -502,6 +503,6 @@ if __name__ == "__main__":
 
     project_root = Path(__file__).resolve().parent.parent
     run_extraction(
-        raw_dir=project_root / "data" / "raw",
+        raw_dir=RAW_DIR,
         extracted_dir=project_root / "data" / "extracted",
     )
